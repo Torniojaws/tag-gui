@@ -33,7 +33,12 @@ DEFAULT_COLUMNS = ["Artist", "Song", "Album", "Year", "Duration"]
 
 
 def app_data_dir() -> Path:
-    base = Path(os.environ.get("APPDATA", str(Path.home())))
+    if sys.platform == "win32":
+        base = Path(os.environ.get("APPDATA", str(Path.home())))
+    elif sys.platform == "darwin":
+        base = Path.home() / "Library" / "Application Support"
+    else:
+        base = Path.home() / ".config"
     path = base / "tag-gui"
     path.mkdir(parents=True, exist_ok=True)
     return path
@@ -150,7 +155,7 @@ class Playlist:
 class SeekSlider(QSlider):
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
-            value = self.minimum() + ((self.maximum() - self.minimum()) * event.position().x()) / max(1, self.width())
+            value = self.minimum() + ((self.maximum() - self.minimum()) * event.pos().x()) / max(1, self.width())
             self.setValue(int(value))
             self.sliderMoved.emit(int(value))
         super().mousePressEvent(event)
@@ -287,7 +292,9 @@ class MainWindow(QMainWindow):
         table.itemChanged.connect(self.on_item_changed)
         return table
 
-    def on_tabbar_double_clicked(self, _index):
+    def on_tabbar_double_clicked(self, index):
+        if index != -1:
+            return
         name, file_name = self.next_default_playlist_name()
         playlist = Playlist(name=name, file_name=file_name, tracks=[])
         self.playlists.append(playlist)
@@ -385,7 +392,7 @@ class MainWindow(QMainWindow):
         p = Path(path)
         easy = load_easy_tags(p)
         artist = get_field(easy, "artist") if easy else ""
-        title = get_field(easy, "title") if easy else p.stem
+        title = get_field(easy, "title") if easy else ""
         album = get_field(easy, "album") if easy else ""
         date = get_field(easy, "date") if easy else ""
         year = date[:4] if date else ""
@@ -452,8 +459,10 @@ class MainWindow(QMainWindow):
         except Exception as exc:
             QMessageBox.warning(self, "Tag write failed", f"Could not update tag '{tag}' for file:\n{track}\n\n{exc}")
             self._updating_table = True
-            item.setCheckState(Qt.Unchecked if checked else Qt.Checked)
-            self._updating_table = False
+            try:
+                item.setCheckState(Qt.Unchecked if checked else Qt.Checked)
+            finally:
+                self._updating_table = False
 
     def play_row(self, row: int):
         table = self.current_table()
@@ -514,6 +523,7 @@ class MainWindow(QMainWindow):
         if idx < 0:
             return
         playlist = self.playlists[idx]
+        old_file_name = playlist.file_name
         new_name, ok = QInputDialog.getText(self, "Rename playlist", "Playlist name:", text=playlist.name)
         if not ok:
             return
@@ -529,11 +539,21 @@ class MainWindow(QMainWindow):
             return
         if not new_file.lower().endswith(".m3u"):
             new_file += ".m3u"
+        if Path(new_file).name != new_file:
+            QMessageBox.warning(self, "Invalid filename", "Playlist filename must not include directories.")
+            return
+        if any(i != idx and p.file_name.lower() == new_file.lower() for i, p in enumerate(self.playlists)):
+            QMessageBox.warning(self, "Filename in use", "Another playlist is already using that .m3u filename.")
+            return
 
         playlist.name = new_name
         playlist.file_name = new_file
         self.tabs.setTabText(idx, new_name)
         self.save_state()
+        if old_file_name.lower() != new_file.lower():
+            old_path = self.data_dir / old_file_name
+            if old_path.exists():
+                old_path.unlink()
 
     def closeEvent(self, event):
         self.save_custom_tags()
