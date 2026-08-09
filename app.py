@@ -1,6 +1,7 @@
 import json
 import os
 import sys
+import unicodedata
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List
@@ -51,15 +52,28 @@ def seconds_to_mmss(seconds: float) -> str:
 
 def parse_custom_tags(text: str) -> List[str]:
     tags = []
+    seen = set()
     for part in text.split(","):
-        t = part.strip()
-        if t and t not in tags:
+        t = unicodedata.normalize("NFC", part.strip())
+        key = normalize_tag_name(t)
+        if t and key not in seen:
+            seen.add(key)
             tags.append(t)
     return tags
 
 
+def ascii_tag_key(name: str) -> str:
+    """Tag names are shown as typed but stored as ASCII, so "Yömusa" is written as "Yomusa"."""
+    key = []
+    for char in unicodedata.normalize("NFKD", str(name).strip()):
+        if unicodedata.combining(char):
+            continue
+        key.append(char if " " <= char <= "}" and char != "=" else "_")
+    return "".join(key)
+
+
 def normalize_tag_name(name: str) -> str:
-    return name.strip().lower()
+    return ascii_tag_key(name).casefold()
 
 
 def load_easy_tags(path: Path):
@@ -88,7 +102,7 @@ def get_field(tags, key: str) -> str:
 
 def get_duration(path: Path) -> str:
     audio = load_raw_tags(path)
-    if not audio or not getattr(audio, "info", None):
+    if audio is None or not getattr(audio, "info", None):
         return "00:00"
     return seconds_to_mmss(getattr(audio.info, "length", 0))
 
@@ -103,7 +117,8 @@ def get_tag_values_case_insensitive(tags, target: str):
 
 def custom_tag_checked(path: Path, tag_name: str) -> bool:
     audio = load_raw_tags(path)
-    if not audio or not audio.tags:
+    # A tagless file is falsy in mutagen, so compare against None explicitly.
+    if audio is None or not audio.tags:
         return False
 
     if isinstance(audio.tags, ID3):
@@ -122,8 +137,10 @@ def custom_tag_checked(path: Path, tag_name: str) -> bool:
 
 def set_custom_tag(path: Path, tag_name: str, checked: bool):
     audio = load_raw_tags(path)
-    if not audio:
+    if audio is None:
         return
+
+    tag_name = ascii_tag_key(tag_name)
 
     if audio.tags is None:
         audio.add_tags()

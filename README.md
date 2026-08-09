@@ -15,6 +15,7 @@ python app.py
 - Double-click row to play, plus Previous/Play/Pause/Stop/Next controls
 - Clickable seek/progress bar
 - Custom checkbox-tag columns via comma-separated textbox (persisted in `custom_tags.txt` under app data)
+- Tag names are displayed as typed but stored as ASCII (`Yömusa` is written to files as `Yomusa`)
 - Custom tag value `X` means checked; unchecking removes the tag from the file, checking writes it back
 - Sortable/resizable columns with horizontal scrolling
 - Tabbed M3U playlists persisted between sessions (`default.m3u`, `default1.m3u`, ...)
