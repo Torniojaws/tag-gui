@@ -14,6 +14,7 @@ from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer
 from PySide6.QtWidgets import (
     QApplication,
     QAbstractItemView,
+    QFileDialog,
     QHBoxLayout,
     QHeaderView,
     QInputDialog,
@@ -34,6 +35,12 @@ AUDIO_EXTENSIONS = {".mp3", ".flac"}
 DEFAULT_COLUMNS = ["Artist", "Song", "Album", "Year", "Duration"]
 ICON_SIZES = (16, 24, 32, 48, 64, 128, 256)
 APP_ID = "tag-gui.tag-gui"
+# Explicit background/text pair so selected rows stay readable under light and dark themes.
+SELECTION_STYLE = """
+QTableView { selection-background-color: #5a67a3; selection-color: #ffffff; }
+QTableView::item:selected { background: #5a67a3; color: #ffffff; }
+QTableView::item:selected:!active { background: #5a67a3; color: #ffffff; }
+"""
 
 
 def note_pixmap(size: int) -> QPixmap:
@@ -210,11 +217,18 @@ class TagCheckItem(QTableWidgetItem):
 
 
 class PlaylistTable(QTableWidget):
-    def __init__(self, on_files_dropped, parent=None):
+    def __init__(self, on_files_dropped, on_delete_pressed, parent=None):
         super().__init__(parent)
         self.on_files_dropped = on_files_dropped
+        self.on_delete_pressed = on_delete_pressed
         self.setAcceptDrops(True)
         self.setDragDropMode(QAbstractItemView.DropOnly)
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_Delete and not event.modifiers():
+            self.on_delete_pressed()
+            return
+        super().keyPressEvent(event)
 
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():
@@ -278,6 +292,7 @@ class MainWindow(QMainWindow):
         self.pause_btn = QPushButton("Pause")
         self.stop_btn = QPushButton("Stop")
         self.next_btn = QPushButton("Next")
+        self.add_btn = QPushButton("Add Files")
         self.rename_btn = QPushButton("Rename / Save As")
 
         self.prev_btn.clicked.connect(self.play_previous)
@@ -285,9 +300,18 @@ class MainWindow(QMainWindow):
         self.pause_btn.clicked.connect(self.player.pause)
         self.stop_btn.clicked.connect(self.player.stop)
         self.next_btn.clicked.connect(self.play_next)
+        self.add_btn.clicked.connect(self.add_files_dialog)
         self.rename_btn.clicked.connect(self.rename_playlist)
 
-        for btn in [self.prev_btn, self.play_btn, self.pause_btn, self.stop_btn, self.next_btn, self.rename_btn]:
+        for btn in [
+            self.prev_btn,
+            self.play_btn,
+            self.pause_btn,
+            self.stop_btn,
+            self.next_btn,
+            self.add_btn,
+            self.rename_btn,
+        ]:
             controls.addWidget(btn)
 
         self.progress = SeekSlider(Qt.Horizontal)
@@ -320,12 +344,13 @@ class MainWindow(QMainWindow):
         return self.tabs.currentWidget()
 
     def create_table(self):
-        table = PlaylistTable(self.add_tracks_to_current_playlist)
+        table = PlaylistTable(self.add_tracks_to_current_playlist, self.remove_selected_tracks)
         table.setSortingEnabled(True)
         table.setHorizontalScrollMode(QAbstractItemView.ScrollPerPixel)
         table.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         table.setSelectionBehavior(QAbstractItemView.SelectRows)
-        table.setSelectionMode(QAbstractItemView.SingleSelection)
+        table.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        table.setStyleSheet(SELECTION_STYLE)
         table.horizontalHeader().setSectionsMovable(False)
         table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
         table.verticalHeader().setVisible(False)
@@ -477,6 +502,64 @@ class MainWindow(QMainWindow):
                 playlist.tracks.append(p)
         table = self.current_table()
         self.populate_table(table, playlist)
+        self.save_state()
+
+    def add_files_dialog(self):
+        paths, _ = QFileDialog.getOpenFileNames(
+            self,
+            "Add Files",
+            "",
+            "Audio files (*.mp3 *.flac)",
+        )
+        if paths:
+            self.add_tracks_to_current_playlist([str(Path(p)) for p in paths])
+
+    def row_for_path(self, table: PlaylistTable, path: str) -> int:
+        if not path:
+            return -1
+        target = Path(path)
+        for row in range(table.rowCount()):
+            item = table.item(row, 0)
+            stored = item.data(Qt.UserRole) if item else None
+            if stored and Path(stored) == target:
+                return row
+        return -1
+
+    def remove_selected_tracks(self):
+        table = self.current_table()
+        rows = sorted({index.row() for index in table.selectedIndexes()})
+        paths = []
+        for row in rows:
+            item = table.item(row, 0)
+            stored = item.data(Qt.UserRole) if item else None
+            if stored:
+                paths.append(stored)
+        if not paths:
+            return
+
+        if len(paths) > 1:
+            answer = QMessageBox.question(
+                self,
+                "Remove files",
+                f"Remove {len(paths)} files from the playlist?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
+            )
+            if answer != QMessageBox.Yes:
+                return
+
+        removed = {Path(p) for p in paths}
+        playing = self.player.source().toLocalFile()
+        playlist = self.current_playlist()
+        playlist.tracks = [t for t in playlist.tracks if Path(t) not in removed]
+        self.populate_table(table, playlist)
+
+        if playing and Path(playing) in removed:
+            self.player.stop()
+            self.player.setSource(QUrl())
+            self.current_track_index = -1
+        else:
+            self.current_track_index = self.row_for_path(table, playing)
         self.save_state()
 
     def on_item_double_clicked(self, item):

@@ -10,6 +10,20 @@ python app.py
 
 ## Build a standalone executable
 
+[`build.py`](build.py) runs the build steps in sequence and needs nothing but Python:
+
+```powershell
+.\build deps      # requirements.txt + pyinstaller
+.\build           # regenerates tag-gui.ico when needed, then packages the app
+.\build run       # runs the built executable (use `.\build build run` to do both)
+.\build clean
+```
+
+`.\build` is the [`build.cmd`](build.cmd) wrapper; PowerShell requires the `.\` prefix, `cmd.exe`
+does not. On macOS/Linux run `python build.py <task>` instead.
+
+The equivalent commands by hand are:
+
 ```bash
 pip install pyinstaller
 python make_icon.py   # only needed if tag-gui.ico is missing or the icon changed
@@ -21,7 +35,8 @@ installation. PyInstaller is not a cross-compiler, so build on the platform you 
 
 ## Features
 
-- Drag and drop `.mp3` / `.flac` files into playlist tables
+- Drag and drop `.mp3` / `.flac` files into playlist tables, or use the Add Files button
+- Select rows (shift/ctrl click, `Ctrl+A`) and press `Delete` to remove them; removing several asks for confirmation
 - Playlist columns: Artist, Song, Album, Year, Duration
 - Double-click row to play, plus Previous/Play/Pause/Stop/Next controls
 - Clickable seek/progress bar
