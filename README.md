@@ -8,6 +8,17 @@ pip install -r requirements.txt
 python app.py
 ```
 
+## Build a standalone executable
+
+```bash
+pip install pyinstaller
+python make_icon.py   # only needed if tag-gui.ico is missing or the icon changed
+pyinstaller --noconfirm --clean --onefile --windowed --icon tag-gui.ico --name tag-gui app.py
+```
+
+The binary is written to `dist/tag-gui` (`dist\tag-gui.exe` on Windows) and needs no Python
+installation. PyInstaller is not a cross-compiler, so build on the platform you target.
+
 ## Features
 
 - Drag and drop `.mp3` / `.flac` files into playlist tables

@@ -9,6 +9,7 @@ from typing import List
 from mutagen import File as MutagenFile
 from mutagen.id3 import ID3, TXXX
 from PySide6.QtCore import QUrl, Qt
+from PySide6.QtGui import QColor, QFont, QIcon, QPainter, QPixmap
 from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer
 from PySide6.QtWidgets import (
     QApplication,
@@ -31,6 +32,29 @@ from PySide6.QtWidgets import (
 
 AUDIO_EXTENSIONS = {".mp3", ".flac"}
 DEFAULT_COLUMNS = ["Artist", "Song", "Album", "Year", "Duration"]
+ICON_SIZES = (16, 24, 32, 48, 64, 128, 256)
+APP_ID = "tag-gui.tag-gui"
+
+
+def note_pixmap(size: int) -> QPixmap:
+    pixmap = QPixmap(size, size)
+    pixmap.fill(Qt.transparent)
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.TextAntialiasing)
+    font = QFont("Segoe UI Symbol")
+    font.setPixelSize(int(size * 0.9))
+    painter.setFont(font)
+    painter.setPen(QColor("#2d6cdf"))
+    painter.drawText(pixmap.rect(), Qt.AlignCenter, "\u266a")
+    painter.end()
+    return pixmap
+
+
+def note_icon() -> QIcon:
+    icon = QIcon()
+    for size in ICON_SIZES:
+        icon.addPixmap(note_pixmap(size))
+    return icon
 
 
 def app_data_dir() -> Path:
@@ -579,7 +603,13 @@ class MainWindow(QMainWindow):
 
 
 def main():
+    if sys.platform == "win32":
+        # Without an explicit AppUserModelID Windows shows the host python.exe icon in the taskbar.
+        import ctypes
+
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(APP_ID)
     app = QApplication(sys.argv)
+    app.setWindowIcon(note_icon())
     win = MainWindow()
     win.resize(1200, 700)
     win.show()
