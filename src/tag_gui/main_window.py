@@ -134,7 +134,6 @@ class MainWindow(QMainWindow):
 
     def create_table(self):
         table = PlaylistTable(self.add_tracks_to_current_playlist, self.remove_selected_tracks)
-        table.setSortingEnabled(True)
         table.setHorizontalScrollMode(QAbstractItemView.ScrollPerPixel)
         table.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         table.setSelectionBehavior(QAbstractItemView.SelectRows)
@@ -296,7 +295,6 @@ class MainWindow(QMainWindow):
         try:
             headers = DEFAULT_COLUMNS + self.custom_tags
             table.clear()
-            table.setSortingEnabled(False)
             table.setColumnCount(len(headers))
             table.setHorizontalHeaderLabels(headers)
             table.setRowCount(len(playlist.tracks))
@@ -327,9 +325,9 @@ class MainWindow(QMainWindow):
                     item.setData(Qt.UserRole, track)
                     item.setData(Qt.UserRole + 1, tag)
                     table.setItem(row, col, item)
+            table.reapply_sort()
             table.resizeColumnsToContents()
         finally:
-            table.setSortingEnabled(True)
             if progress:
                 progress.close()
             self._updating_table = False

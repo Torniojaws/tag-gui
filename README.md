@@ -55,7 +55,7 @@ installation. PyInstaller is not a cross-compiler, so build on the platform you 
 - Custom checkbox-tag columns via comma-separated textbox (persisted in `custom_tags.txt` under app data)
 - Tag names are displayed as typed but stored as ASCII (`Yömusa` is written to files as `Yomusa`)
 - Custom tag value `X` means checked; unchecking removes the tag from the file, checking writes it back
-- Sortable/resizable columns with horizontal scrolling
+- Sortable/resizable columns with horizontal scrolling; a header click sorts descending first (checked tags on top) and scrolls back to the top
 - Tabbed M3U playlists persisted between sessions (`default.m3u`, `default1.m3u`, ...)
 - Add Playlist button, or right-click the tab bar for Add / Remove playlist (removal asks first and deletes the `.m3u`)
 - Double-click empty tab bar space to create the next default playlist
