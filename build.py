@@ -37,6 +37,12 @@ def icon() -> None:
 
 def build() -> None:
     icon()
+    if EXE.exists():
+        try:
+            EXE.unlink()
+        except PermissionError:
+            # Windows locks a running executable, and PyInstaller only fails once it is done.
+            raise SystemExit(f"{EXE} is in use - close the running app and build again")
     run(
         PYTHON, "-m", "PyInstaller",
         "--noconfirm", "--clean", "--onefile", "--windowed",
