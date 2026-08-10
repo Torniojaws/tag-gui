@@ -39,18 +39,20 @@ from .widgets import PlaylistTable, SeekSlider, TagCheckItem
 
 
 class MainWindow(QMainWindow):
-    def __init__(self):
+    def __init__(self, splash=None):
         super().__init__()
         self.setWindowTitle("Tag GUI")
         self.data_dir = app_data_dir()
         self.custom_tags_file = self.data_dir / "custom_tags.txt"
         self.playlists_file = self.data_dir / "playlists.json"
 
+        self.splash = splash
         self.custom_tags: List[str] = []
         self.playlists: List[Playlist] = []
         self.current_track_index = -1
         self._updating_table = False
-        self.metadata = MetadataCache()
+        self.metadata = MetadataCache(self.data_dir / "metadata.json")
+        self.metadata.load()
 
         self.player = QMediaPlayer()
         self.audio_output = QAudioOutput()
@@ -270,6 +272,7 @@ class MainWindow(QMainWindow):
             self.populate_table(table, playlist)
 
         self.tabs.setCurrentIndex(min(active_index, self.tabs.count() - 1))
+        self.splash = None
         self.save_state()
 
     def save_state(self):
@@ -280,6 +283,7 @@ class MainWindow(QMainWindow):
             "playlists": [{"name": p.name, "file_name": p.file_name} for p in self.playlists],
         }
         self.playlists_file.write_text(json.dumps(state, indent=2), encoding="utf-8")
+        self.metadata.save(keep={track for p in self.playlists for track in p.tracks})
 
     def apply_custom_tags(self):
         self.custom_tags = parse_custom_tags(self.tags_input.text())
@@ -291,7 +295,7 @@ class MainWindow(QMainWindow):
 
     def populate_table(self, table: PlaylistTable, playlist: Playlist):
         self._updating_table = True
-        progress = None
+        update, finish = self.start_progress(f"Reading tags for {playlist.name}", len(playlist.tracks))
         try:
             headers = DEFAULT_COLUMNS + self.custom_tags
             table.clear()
@@ -299,17 +303,9 @@ class MainWindow(QMainWindow):
             table.setHorizontalHeaderLabels(headers)
             table.setRowCount(len(playlist.tracks))
 
-            total = len(playlist.tracks)
-            if total > PROGRESS_THRESHOLD:
-                progress = QProgressDialog("Reading tags...", None, 0, total, self)
-                progress.setWindowTitle("Loading playlist")
-                progress.setWindowModality(Qt.WindowModal)
-                progress.setMinimumDuration(300)
-
             for row, track in enumerate(playlist.tracks):
-                if progress and row % POPULATE_BATCH == 0:
-                    progress.setValue(row)
-                    QApplication.processEvents()
+                if row % POPULATE_BATCH == 0:
+                    update(row)
                 info = self.metadata.get(track, self.custom_tags)
                 for col, value in enumerate(info.fields):
                     item = QTableWidgetItem(value)
@@ -328,9 +324,26 @@ class MainWindow(QMainWindow):
             table.reapply_sort()
             table.resizeColumnsToContents()
         finally:
-            if progress:
-                progress.close()
+            finish()
             self._updating_table = False
+
+    def start_progress(self, label: str, total: int):
+        """Report progress on the splash while starting, in a modal dialog afterwards."""
+        if self.splash is not None:
+            self.splash.begin(label, total)
+            return self.splash.update_progress, self.splash.end
+        if total <= PROGRESS_THRESHOLD:
+            return (lambda _value: None), (lambda: None)
+        dialog = QProgressDialog(f"{label}...", None, 0, total, self)
+        dialog.setWindowTitle("Loading playlist")
+        dialog.setWindowModality(Qt.WindowModal)
+        dialog.setMinimumDuration(300)
+
+        def update(value: int):
+            dialog.setValue(value)
+            QApplication.processEvents()
+
+        return update, dialog.close
 
     def add_tracks_to_current_playlist(self, paths: List[str]):
         tracks = self.scan_for_audio_files(paths)
@@ -546,4 +559,5 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event):
         self.save_custom_tags()
         self.save_state()
+        self.metadata.save()
         super().closeEvent(event)

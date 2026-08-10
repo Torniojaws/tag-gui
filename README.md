@@ -63,6 +63,8 @@ file is also attached to the workflow run as an artifact.
 - Tag names are displayed as typed but stored as ASCII (`Yömusa` is written to files as `Yomusa`)
 - Custom tag value `X` means checked; unchecking removes the tag from the file, checking writes it back
 - Sortable/resizable columns with horizontal scrolling; a header click sorts descending first (checked tags on top) and scrolls back to the top
+- Splash screen with a progress bar while playlists load at startup
+- Tags read from files are cached in `metadata.json` under app data and reused until a file's timestamp changes, so restarts do not re-read every file
 - Tabbed M3U playlists persisted between sessions (`default.m3u`, `default1.m3u`, ...)
 - Add Playlist button, or right-click the tab bar for Add / Remove playlist (removal asks first and deletes the `.m3u`)
 - Double-click empty tab bar space to create the next default playlist
