@@ -2,9 +2,19 @@
 
 Tag GUI for audio file tagging, including custom tags that are configurable in the UI.
 
-This is almost entirely AI-generated, so no warranty :D
+Features:
+
+- Standard audio playback and playlist (m3u) features you'll find in any audio player
+- Ability to edit standard tags, including mass editing
+- Can add custom tags with checkboxes which will be written to the audio file metadata
+- Can sort the files of course
+
+This is almost entirely AI-generated, so no warranties :D
 
 [![Tests and build](https://github.com/Torniojaws/tag-gui/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/Torniojaws/tag-gui/actions/workflows/build.yml)
+
+<img width="1919" height="1043" alt="image" src="https://github.com/user-attachments/assets/381c1a9c-0c7e-415a-8363-1b3442700449" />
+
 
 ## Run
 
