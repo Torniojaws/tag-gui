@@ -2,8 +2,9 @@ import json
 from pathlib import Path
 from typing import List
 
-from PySide6.QtCore import QUrl, Qt
-from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer
+from PySide6.QtCore import QSize, QUrl, Qt
+from PySide6.QtGui import QColor
+from PySide6.QtMultimedia import QAudio, QAudioOutput, QMediaPlayer
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
@@ -18,6 +19,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QProgressDialog,
     QPushButton,
+    QSlider,
     QTableWidgetItem,
     QVBoxLayout,
     QWidget,
@@ -32,6 +34,9 @@ from .constants import (
     DURATION_COLUMN,
     DURATION_COLUMN_PADDING,
     LEFT_ALIGNED_HEADERS,
+    MUTE_BUTTON_SIZE,
+    MUTE_ICON_COLOR,
+    MUTE_ICON_SIZE,
     NEXT_BUTTON_GLYPH,
     PAUSE_BUTTON_GLYPH,
     PAUSE_BUTTON_STYLE,
@@ -49,11 +54,14 @@ from .constants import (
     STOP_BUTTON_STYLE,
     TRANSPORT_BUTTON_RANGE,
     TRANSPORT_BUTTON_SCALE,
+    VOLUME_DEFAULT,
+    VOLUME_SLIDER_WIDTH,
     YEAR_COLUMN,
 )
 from .models import Playlist
 from .metadata import MetadataCache
 from .dialogs import StandardTagsDialog
+from .icons import speaker_icon
 from .tags import parse_custom_tags, set_custom_tag, set_standard_tags
 from .utils import app_data_dir, collect_audio_files, seconds_to_mmss, slugify
 from .widgets import (
@@ -180,7 +188,25 @@ class MainWindow(QMainWindow):
         self.progress.sliderMoved.connect(self.player.setPosition)
         self.progress_label = QLabel("00:00 / 00:00")
 
+        self.mute_btn = QPushButton()
+        self.mute_btn.setCheckable(True)
+        self.mute_btn.setToolTip("Mute, independent of the volume slider")
+        self.mute_btn.setFixedSize(MUTE_BUTTON_SIZE, MUTE_BUTTON_SIZE)
+        self.mute_btn.setIconSize(QSize(MUTE_ICON_SIZE, MUTE_ICON_SIZE))
+        self.mute_btn.toggled.connect(self.on_mute_toggled)
+
+        self.volume_slider = QSlider(Qt.Horizontal)
+        self.volume_slider.setRange(0, 100)
+        self.volume_slider.setFixedWidth(VOLUME_SLIDER_WIDTH)
+        self.volume_slider.setSingleStep(5)
+        self.volume_slider.setPageStep(10)
+        self.volume_slider.valueChanged.connect(self.on_volume_changed)
+        self.volume_slider.setValue(VOLUME_DEFAULT)
+        self.update_mute_icon(False)
+
         progress_layout = QHBoxLayout()
+        progress_layout.addWidget(self.volume_slider)
+        progress_layout.addWidget(self.mute_btn)
         progress_layout.addWidget(self.progress)
         progress_layout.addWidget(self.progress_label)
 
@@ -765,6 +791,21 @@ class MainWindow(QMainWindow):
 
     def on_duration_changed(self, duration: int):
         self.progress.setRange(0, max(0, duration))
+
+    def on_volume_changed(self, value: int):
+        # Sliders feel linear to the ear only after a logarithmic conversion.
+        self.audio_output.setVolume(
+            QAudio.convertVolume(value / 100, QAudio.LogarithmicVolumeScale, QAudio.LinearVolumeScale)
+        )
+        self.volume_slider.setToolTip(f"Volume {value}%")
+
+    def on_mute_toggled(self, muted: bool):
+        self.audio_output.setMuted(muted)
+        self.update_mute_icon(muted)
+
+    def update_mute_icon(self, muted: bool):
+        color = QColor(MUTE_ICON_COLOR) if muted else self.palette().windowText().color()
+        self.mute_btn.setIcon(speaker_icon(MUTE_ICON_SIZE, color))
 
     def save_playlist_as(self):
         index = self.tabs.currentIndex()

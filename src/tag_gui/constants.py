@@ -29,6 +29,11 @@ QPushButton:pressed { background-color: #75403c; }
 TRANSPORT_BUTTON_SCALE = 0.05
 TRANSPORT_BUTTON_RANGE = (36, 72)
 ACTIONS_WIDTH_SHARE = 0.25
+VOLUME_DEFAULT = 75
+VOLUME_SLIDER_WIDTH = 120
+MUTE_BUTTON_SIZE = 28
+MUTE_ICON_SIZE = 18
+MUTE_ICON_COLOR = "#b04a45"
 DEFAULT_COLUMNS = ["Artist", "Duration", "Song", "Year", "Album"]
 # Editable standard columns, paired with their mutagen easy-tag key. Duration is derived.
 STANDARD_TAG_FIELDS = (("Artist", "artist"), ("Song", "title"), ("Year", "date"), ("Album", "album"))
