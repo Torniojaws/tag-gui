@@ -1,0 +1,55 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-main
+  cancel-in-progress: false
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    env:
+      # make_icon.py needs a Qt platform plugin, and the runner has no display.
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+          cache: pip
+
+      - name: Compute version
+        id: version
+        run: echo "value=$(Get-Date -Format 'yyyyMMddHHmm')" >> $env:GITHUB_OUTPUT
+
+      - name: Install dependencies
+        run: python build.py deps
+
+      - name: Build executable
+        run: python build.py build
+
+      - name: Name executable after the build time
+        run: Move-Item dist\tag-gui.exe dist\tag-gui-${{ steps.version.outputs.value }}.exe
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tag-gui-${{ steps.version.outputs.value }}
+          path: dist/tag-gui-${{ steps.version.outputs.value }}.exe
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create "v${{ steps.version.outputs.value }}"
+          "dist/tag-gui-${{ steps.version.outputs.value }}.exe"
+          --title "tag-gui ${{ steps.version.outputs.value }}"
+          --notes "Automated Windows build from ${{ github.sha }}."
+          --latest

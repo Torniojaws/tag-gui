@@ -44,6 +44,13 @@ pyinstaller --noconfirm --clean --onefile --windowed --icon tag-gui.ico --name t
 The binary is written to `dist/tag-gui` (`dist\tag-gui.exe` on Windows) and needs no Python
 installation. PyInstaller is not a cross-compiler, so build on the platform you target.
 
+## Automated builds
+
+Every push to `main` runs [.github/workflows/build.yml](.github/workflows/build.yml), which builds
+the Windows executable and publishes it as a release tagged with the build time, e.g. `v202608101505`
+containing `tag-gui-202608101505.exe`. Releases are linked from the repository front page; the same
+file is also attached to the workflow run as an artifact.
+
 ## Features
 
 - Drag and drop audio files (`.mp3`, `.flac`, `.fla`, `.wma`, `.aac`) or whole folders into playlist tables, or use the Add Files button
