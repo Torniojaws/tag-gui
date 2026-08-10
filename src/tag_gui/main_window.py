@@ -12,7 +12,6 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QHBoxLayout,
     QHeaderView,
-    QLabel,
     QLineEdit,
     QMainWindow,
     QMenu,
@@ -181,16 +180,11 @@ class MainWindow(QMainWindow):
         right_side.addStretch(1)
         right_side.addWidget(actions)
 
-        controls.addStretch(1)
-        controls.addLayout(transport)
-        controls.addLayout(right_side, 1)
-
         self.progress = SeekSlider(Qt.Horizontal)
         self.progress.setRange(0, 0)
         self.progress.setFixedHeight(PROGRESS_HEIGHT)
         self.progress.setStyleSheet(PROGRESS_STYLE)
         self.progress.sliderMoved.connect(self.player.setPosition)
-        self.progress_label = QLabel("00:00 / 00:00")
 
         self.mute_btn = QPushButton()
         self.mute_btn.setCheckable(True)
@@ -208,11 +202,14 @@ class MainWindow(QMainWindow):
         self.volume_slider.setValue(VOLUME_DEFAULT)
         self.update_mute_icon(False)
 
-        progress_layout = QHBoxLayout()
-        progress_layout.addWidget(self.volume_slider, 0, Qt.AlignVCenter)
-        progress_layout.addWidget(self.mute_btn, 0, Qt.AlignVCenter)
-        progress_layout.addWidget(self.progress)
-        progress_layout.addWidget(self.progress_label, 0, Qt.AlignVCenter)
+        left_side = QHBoxLayout()
+        left_side.addWidget(self.volume_slider, 0, Qt.AlignVCenter)
+        left_side.addWidget(self.mute_btn, 0, Qt.AlignVCenter)
+        left_side.addStretch(1)
+
+        controls.addLayout(left_side, 1)
+        controls.addLayout(transport)
+        controls.addLayout(right_side, 1)
 
         tags_layout = QHBoxLayout()
         tags_layout.addWidget(self.tags_input)
@@ -220,10 +217,18 @@ class MainWindow(QMainWindow):
 
         central = QWidget()
         layout = QVBoxLayout(central)
+        # Only the seek bar reaches the window edges, so the margins live on the other rows.
+        layout.setContentsMargins(0, 0, 0, 0)
+        tags_layout.setContentsMargins(9, 9, 9, 0)
+        controls.setContentsMargins(9, 0, 9, 6)
+        tabs_row = QHBoxLayout()
+        tabs_row.setContentsMargins(9, 0, 9, 0)
+        tabs_row.addWidget(self.tabs)
+
         layout.addLayout(tags_layout)
-        layout.addWidget(self.tabs)
+        layout.addLayout(tabs_row)
         layout.addLayout(controls)
-        layout.addLayout(progress_layout)
+        layout.addWidget(self.progress)
         self.setCentralWidget(central)
 
         self.load_state()
@@ -791,7 +796,9 @@ class MainWindow(QMainWindow):
         if not self.progress.isSliderDown():
             self.progress.setValue(position)
         duration = self.player.duration() or 0
-        self.progress_label.setText(f"{seconds_to_mmss(position / 1000)} / {seconds_to_mmss(duration / 1000)}")
+        self.progress.set_text(
+            f"{seconds_to_mmss(position / 1000)} / {seconds_to_mmss(duration / 1000)}"
+        )
 
     def on_duration_changed(self, duration: int):
         self.progress.setRange(0, max(0, duration))

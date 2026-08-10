@@ -41,6 +41,8 @@ QSlider::sub-page:horizontal { background: #5a67a3; border-radius: 4px; }
 QSlider::add-page:horizontal { background: #cfcfcf; border-radius: 4px; }
 QSlider::handle:horizontal { width: 0px; margin: 0; background: transparent; border: none; }
 """
+PROGRESS_TEXT_ON_FILL = "#ffffff"
+PROGRESS_TEXT_ON_REST = "#333333"
 DEFAULT_COLUMNS = ["Artist", "Duration", "Song", "Year", "Album"]
 # Editable standard columns, paired with their mutagen easy-tag key. Duration is derived.
 STANDARD_TAG_FIELDS = (("Artist", "artist"), ("Song", "title"), ("Year", "date"), ("Album", "album"))
