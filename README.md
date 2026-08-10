@@ -36,7 +36,13 @@ src/tag_gui/
         sliders.py         seek bar with in-bar time text
         transport.py       previous/play/stop/next
         volume.py          volume slider and mute
-        main_window.py     wiring and interactions
+        progress.py        splash/dialog progress reporting
+        window_base.py     state shared by the window slices
+        playlist_actions.py  tab bar and playlist commands
+        file_actions.py    add/load/save row, adding and removing tracks
+        tag_actions.py     custom tag row and tag writing
+        playback.py        player, transport widgets, playback commands
+        main_window.py     assembles the slices into the window
 ```
 
 ## Build a standalone executable

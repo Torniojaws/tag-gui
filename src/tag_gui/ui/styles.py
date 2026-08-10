@@ -48,6 +48,9 @@ PROGRESS_TEXT_ON_REST = "#333333"
 ALBUM_TINT_LIGHT = (232, 238, 247)
 ALBUM_TINT_DARK = (38, 44, 56)
 
+# Breathing room around every row except the seek bar, which reaches the window edges.
+ROW_MARGIN = 9
+
 # Transport buttons are square and sized from the screen height; actions get a share of its width.
 TRANSPORT_BUTTON_SCALE = 0.05
 TRANSPORT_BUTTON_RANGE = (36, 72)
