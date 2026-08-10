@@ -1,6 +1,6 @@
 import unicodedata
 from pathlib import Path
-from typing import List
+from typing import Dict, Iterable, List
 
 from mutagen import File as MutagenFile
 from mutagen.id3 import ID3, TXXX
@@ -73,8 +73,7 @@ def get_tag_values_case_insensitive(tags, target: str):
     return None, None
 
 
-def custom_tag_checked(path: Path, tag_name: str) -> bool:
-    audio = load_raw_tags(path)
+def custom_tag_checked(audio, tag_name: str) -> bool:
     # A tagless file is falsy in mutagen, so compare against None explicitly.
     if audio is None or not audio.tags:
         return False
@@ -91,6 +90,12 @@ def custom_tag_checked(path: Path, tag_name: str) -> bool:
     if not key or not values:
         return False
     return any(str(v) == "X" for v in values)
+
+
+def read_custom_tag_states(path: Path, tag_names: Iterable[str]) -> Dict[str, bool]:
+    """Read every custom tag of a file from one open, instead of one open per tag."""
+    audio = load_raw_tags(path)
+    return {tag: custom_tag_checked(audio, tag) for tag in tag_names}
 
 
 def set_custom_tag(path: Path, tag_name: str, checked: bool):

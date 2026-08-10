@@ -51,10 +51,11 @@ class PlaylistTable(QTableWidget):
     def dropEvent(self, event):
         paths = []
         for url in event.mimeData().urls():
-            if url.isLocalFile():
-                local = Path(url.toLocalFile())
-                if local.suffix.lower() in AUDIO_EXTENSIONS:
-                    paths.append(str(local))
+            if not url.isLocalFile():
+                continue
+            local = Path(url.toLocalFile())
+            if local.is_dir() or local.suffix.lower() in AUDIO_EXTENSIONS:
+                paths.append(str(local))
         if paths:
             self.on_files_dropped(paths)
             event.acceptProposedAction()

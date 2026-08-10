@@ -6,6 +6,7 @@ from PySide6.QtCore import QUrl, Qt
 from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QApplication,
     QFileDialog,
     QHBoxLayout,
     QHeaderView,
@@ -15,6 +16,7 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMenu,
     QMessageBox,
+    QProgressDialog,
     QPushButton,
     QTableWidgetItem,
     QTabWidget,
@@ -22,17 +24,17 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .constants import DEFAULT_COLUMNS, SELECTION_STYLE
-from .models import Playlist
-from .tags import (
-    custom_tag_checked,
-    get_duration,
-    get_field,
-    load_easy_tags,
-    parse_custom_tags,
-    set_custom_tag,
+from .constants import (
+    AUDIO_FILE_FILTER,
+    DEFAULT_COLUMNS,
+    POPULATE_BATCH,
+    PROGRESS_THRESHOLD,
+    SELECTION_STYLE,
 )
-from .utils import app_data_dir, seconds_to_mmss
+from .models import Playlist
+from .metadata import MetadataCache
+from .tags import parse_custom_tags, set_custom_tag
+from .utils import app_data_dir, collect_audio_files, seconds_to_mmss
 from .widgets import PlaylistTable, SeekSlider, TagCheckItem
 
 
@@ -48,6 +50,7 @@ class MainWindow(QMainWindow):
         self.playlists: List[Playlist] = []
         self.current_track_index = -1
         self._updating_table = False
+        self.metadata = MetadataCache()
 
         self.player = QMediaPlayer()
         self.audio_output = QAudioOutput()
@@ -139,6 +142,8 @@ class MainWindow(QMainWindow):
         table.setStyleSheet(SELECTION_STYLE)
         table.horizontalHeader().setSectionsMovable(False)
         table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
+        # Sizing columns against every row is too slow for large playlists.
+        table.horizontalHeader().setResizeContentsPrecision(50)
         table.verticalHeader().setVisible(False)
         table.itemDoubleClicked.connect(self.on_item_double_clicked)
         table.itemChanged.connect(self.on_item_changed)
@@ -285,29 +290,30 @@ class MainWindow(QMainWindow):
             self.populate_table(table, playlist)
         self.save_state()
 
-    def track_metadata(self, path: str):
-        p = Path(path)
-        easy = load_easy_tags(p)
-        artist = get_field(easy, "artist") if easy else ""
-        title = get_field(easy, "title") if easy else ""
-        album = get_field(easy, "album") if easy else ""
-        date = get_field(easy, "date") if easy else ""
-        year = date[:4] if date else ""
-        duration = get_duration(p)
-        return [artist, title or p.stem, album, year, duration]
-
     def populate_table(self, table: PlaylistTable, playlist: Playlist):
         self._updating_table = True
+        progress = None
         try:
             headers = DEFAULT_COLUMNS + self.custom_tags
             table.clear()
+            table.setSortingEnabled(False)
             table.setColumnCount(len(headers))
             table.setHorizontalHeaderLabels(headers)
             table.setRowCount(len(playlist.tracks))
 
+            total = len(playlist.tracks)
+            if total > PROGRESS_THRESHOLD:
+                progress = QProgressDialog("Reading tags...", None, 0, total, self)
+                progress.setWindowTitle("Loading playlist")
+                progress.setWindowModality(Qt.WindowModal)
+                progress.setMinimumDuration(300)
+
             for row, track in enumerate(playlist.tracks):
-                fields = self.track_metadata(track)
-                for col, value in enumerate(fields):
+                if progress and row % POPULATE_BATCH == 0:
+                    progress.setValue(row)
+                    QApplication.processEvents()
+                info = self.metadata.get(track, self.custom_tags)
+                for col, value in enumerate(info.fields):
                     item = QTableWidgetItem(value)
                     if col == 0:
                         item.setData(Qt.UserRole, track)
@@ -315,32 +321,57 @@ class MainWindow(QMainWindow):
 
                 for offset, tag in enumerate(self.custom_tags):
                     col = len(DEFAULT_COLUMNS) + offset
-                    checked = custom_tag_checked(Path(track), tag)
                     item = TagCheckItem()
                     item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable | Qt.ItemIsUserCheckable)
-                    item.setCheckState(Qt.Checked if checked else Qt.Unchecked)
+                    item.setCheckState(Qt.Checked if info.tag_states.get(tag) else Qt.Unchecked)
                     item.setData(Qt.UserRole, track)
                     item.setData(Qt.UserRole + 1, tag)
                     table.setItem(row, col, item)
             table.resizeColumnsToContents()
         finally:
+            table.setSortingEnabled(True)
+            if progress:
+                progress.close()
             self._updating_table = False
 
     def add_tracks_to_current_playlist(self, paths: List[str]):
+        tracks = self.scan_for_audio_files(paths)
+        if not tracks:
+            return
         playlist = self.current_playlist()
-        for p in paths:
-            if p not in playlist.tracks:
-                playlist.tracks.append(p)
+        known = set(playlist.tracks)
+        for track in tracks:
+            if track not in known:
+                known.add(track)
+                playlist.tracks.append(track)
         table = self.current_table()
         self.populate_table(table, playlist)
         self.save_state()
+
+    def scan_for_audio_files(self, paths: List[str]) -> List[str]:
+        """Expand dropped folders into audio files, reporting progress for big trees."""
+        progress = QProgressDialog("Scanning for audio files...", "Cancel", 0, 0, self)
+        progress.setWindowTitle("Add files")
+        progress.setWindowModality(Qt.WindowModal)
+        progress.setMinimumDuration(300)
+
+        def on_progress(count: int):
+            if count % POPULATE_BATCH:
+                return
+            progress.setLabelText(f"Scanning for audio files... {count} found")
+            QApplication.processEvents()
+
+        try:
+            return collect_audio_files(paths, on_progress, progress.wasCanceled)
+        finally:
+            progress.close()
 
     def add_files_dialog(self):
         paths, _ = QFileDialog.getOpenFileNames(
             self,
             "Add Files",
             "",
-            "Audio files (*.mp3 *.flac)",
+            AUDIO_FILE_FILTER,
         )
         if paths:
             self.add_tracks_to_current_playlist([str(Path(p)) for p in paths])
@@ -383,6 +414,8 @@ class MainWindow(QMainWindow):
         playing = self.player.source().toLocalFile()
         playlist = self.current_playlist()
         playlist.tracks = [t for t in playlist.tracks if Path(t) not in removed]
+        for track in paths:
+            self.metadata.discard(track)
         self.populate_table(table, playlist)
 
         if playing and Path(playing) in removed:
@@ -418,6 +451,8 @@ class MainWindow(QMainWindow):
                 item.setCheckState(Qt.Unchecked if checked else Qt.Checked)
             finally:
                 self._updating_table = False
+            return
+        self.metadata.update_tag_state(track, tag, checked)
 
     def play_row(self, row: int):
         table = self.current_table()

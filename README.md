@@ -46,7 +46,8 @@ installation. PyInstaller is not a cross-compiler, so build on the platform you 
 
 ## Features
 
-- Drag and drop `.mp3` / `.flac` files into playlist tables, or use the Add Files button
+- Drag and drop audio files (`.mp3`, `.flac`, `.fla`, `.wma`, `.aac`) or whole folders into playlist tables, or use the Add Files button
+- Dropped folders are scanned recursively with a cancellable progress dialog; tags are then read in batches so large trees stay responsive
 - Select rows (shift/ctrl click, `Ctrl+A`) and press `Delete` to remove them; removing several asks for confirmation
 - Playlist columns: Artist, Song, Album, Year, Duration
 - Double-click row to play, plus Previous/Play/Pause/Stop/Next controls
