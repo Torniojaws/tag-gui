@@ -43,7 +43,20 @@ src/tag_gui/
         tag_actions.py     custom tag row and tag writing
         playback.py        player, transport widgets, playback commands
         main_window.py     assembles the slices into the window
+tests/                     pytest suite, run with `python build.py test`
 ```
+
+## Tests
+
+```bash
+pip install pytest
+python build.py test
+```
+
+The suite covers `core/` (m3u and state files, tag normalization and writing, the metadata cache,
+file scanning) plus one offscreen run of the real `MainWindow`. Test audio is synthesised by
+[tests/conftest.py](tests/conftest.py), so no binary fixtures are checked in, and the window tests
+set `QT_QPA_PLATFORM=offscreen` so they need no display.
 
 ## Build a standalone executable
 

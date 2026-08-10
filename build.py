@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build tasks for tag-gui: python build.py [deps] [icon] [build] [run] [clean]"""
+"""Build tasks for tag-gui: python build.py [deps] [test] [icon] [build] [run] [clean]"""
 
 import shutil
 import subprocess
@@ -24,7 +24,11 @@ def run(*args: str) -> None:
 
 
 def deps() -> None:
-    run(PYTHON, "-m", "pip", "install", "-r", "requirements.txt", "pyinstaller")
+    run(PYTHON, "-m", "pip", "install", "-r", "requirements.txt", "pyinstaller", "pytest")
+
+
+def test() -> None:
+    run(PYTHON, "-m", "pytest")
 
 
 def icon() -> None:
@@ -67,7 +71,14 @@ def clean() -> None:
     print("removed build artifacts")
 
 
-TASKS = {"deps": deps, "icon": icon, "build": build, "run": run_app, "clean": clean}
+TASKS = {
+    "deps": deps,
+    "test": test,
+    "icon": icon,
+    "build": build,
+    "run": run_app,
+    "clean": clean,
+}
 
 
 def main(argv: list[str]) -> int:
