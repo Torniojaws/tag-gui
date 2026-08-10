@@ -36,6 +36,9 @@ SONG_COLUMN = DEFAULT_COLUMNS.index("Song")
 ALBUM_COLUMN = DEFAULT_COLUMNS.index("Album")
 YEAR_COLUMN = DEFAULT_COLUMNS.index("Year")
 DURATION_COLUMN = DEFAULT_COLUMNS.index("Duration")
+LEFT_ALIGNED_HEADERS = tuple(
+    DEFAULT_COLUMNS.index(name) for name in ("Artist", "Duration", "Song", "Album")
+)
 # Duration only ever shows mm:ss, so it does not need content-based sizing.
 DURATION_COLUMN_PADDING = 24
 # Second shade for alternating album runs, picked per theme lightness.

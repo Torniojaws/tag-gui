@@ -33,6 +33,7 @@ from .constants import (
     DEFAULT_COLUMNS,
     DURATION_COLUMN,
     DURATION_COLUMN_PADDING,
+    LEFT_ALIGNED_HEADERS,
     NEXT_BUTTON_GLYPH,
     PAUSE_BUTTON_GLYPH,
     PAUSE_BUTTON_STYLE,
@@ -355,6 +356,10 @@ class MainWindow(QMainWindow):
             table.clear()
             table.setColumnCount(len(headers))
             table.setHorizontalHeaderLabels(headers)
+            for col in LEFT_ALIGNED_HEADERS:
+                header_item = table.horizontalHeaderItem(col)
+                if header_item:
+                    header_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
             table.setRowCount(len(playlist.tracks))
 
             for row, track in enumerate(playlist.tracks):
