@@ -57,6 +57,7 @@ file is also attached to the workflow run as an artifact.
 - Dropped folders are scanned recursively with a cancellable progress dialog; tags are then read in batches so large trees stay responsive
 - Select rows (shift/ctrl click, `Ctrl+A`) and press `Delete` to remove them; removing several asks for confirmation
 - Playlist columns: Artist, Song, Album, Year, Duration
+- Standard tags are edited via right-click -> Edit tags, which writes only the fields you changed, across every selected row (Duration is read-only)
 - Double-click row to play, plus Previous/Play/Pause/Stop/Next controls
 - Clickable seek/progress bar
 - Custom checkbox-tag columns via comma-separated textbox (persisted in `custom_tags.txt` under app data)

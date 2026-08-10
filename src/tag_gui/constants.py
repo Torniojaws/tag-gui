@@ -29,6 +29,8 @@ TRANSPORT_BUTTON_SCALE = 0.05
 TRANSPORT_BUTTON_RANGE = (36, 72)
 ACTIONS_WIDTH_SHARE = 0.25
 DEFAULT_COLUMNS = ["Artist", "Song", "Album", "Year", "Duration"]
+# Editable standard columns, paired with their mutagen easy-tag key. Duration is derived.
+STANDARD_TAG_FIELDS = (("Artist", "artist"), ("Song", "title"), ("Album", "album"), ("Year", "date"))
 ICON_SIZES = (16, 24, 32, 48, 64, 128, 256)
 APP_ID = "tag-gui.tag-gui"
 # Rows are filled in chunks of this size so the progress dialog stays responsive.

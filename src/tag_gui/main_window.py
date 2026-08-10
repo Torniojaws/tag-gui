@@ -7,6 +7,7 @@ from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
+    QDialog,
     QFileDialog,
     QHBoxLayout,
     QHeaderView,
@@ -47,7 +48,8 @@ from .constants import (
 )
 from .models import Playlist
 from .metadata import MetadataCache
-from .tags import parse_custom_tags, set_custom_tag
+from .dialogs import StandardTagsDialog
+from .tags import parse_custom_tags, set_custom_tag, set_standard_tags
 from .utils import app_data_dir, collect_audio_files, seconds_to_mmss
 from .widgets import PlaylistTable, SeekSlider, TagCheckItem
 
@@ -190,6 +192,8 @@ class MainWindow(QMainWindow):
         # Sizing columns against every row is too slow for large playlists.
         table.horizontalHeader().setResizeContentsPrecision(50)
         table.verticalHeader().setVisible(False)
+        table.setContextMenuPolicy(Qt.CustomContextMenu)
+        table.customContextMenuRequested.connect(self.on_table_context_menu)
         table.itemDoubleClicked.connect(self.on_item_double_clicked)
         table.itemChanged.connect(self.on_item_changed)
         return table
@@ -353,6 +357,8 @@ class MainWindow(QMainWindow):
                 info = self.metadata.get(track, self.custom_tags)
                 for col, value in enumerate(info.fields):
                     item = QTableWidgetItem(value)
+                    # Standard tags are edited through the right-click dialog, never inline.
+                    item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
                     if col == 0:
                         item.setData(Qt.UserRole, track)
                     table.setItem(row, col, item)
@@ -402,6 +408,53 @@ class MainWindow(QMainWindow):
         table = self.current_table()
         self.populate_table(table, playlist)
         self.save_state()
+
+    def on_table_context_menu(self, pos):
+        table = self.current_table()
+        tracks = self.selected_tracks(table)
+        menu = QMenu(self)
+        edit_action = menu.addAction("Edit tags...")
+        edit_action.setEnabled(bool(tracks))
+        if menu.exec(table.mapToGlobal(pos)) is edit_action:
+            self.edit_selected_tags()
+
+    def selected_tracks(self, table: PlaylistTable) -> List[str]:
+        tracks = []
+        seen = set()
+        for row in sorted({index.row() for index in table.selectedIndexes()}):
+            item = table.item(row, 0)
+            track = item.data(Qt.UserRole) if item else None
+            if track and track not in seen:
+                seen.add(track)
+                tracks.append(track)
+        return tracks
+
+    def edit_selected_tags(self):
+        table = self.current_table()
+        tracks = self.selected_tracks(table)
+        if not tracks:
+            return
+        fields = [self.metadata.get(track, self.custom_tags).fields for track in tracks]
+        dialog = StandardTagsDialog(fields, self)
+        if dialog.exec() != QDialog.Accepted:
+            return
+        values = dialog.changed_values()
+        if not values:
+            return
+
+        failures = []
+        for track in tracks:
+            try:
+                set_standard_tags(Path(track), values)
+            except Exception as exc:
+                failures.append(f"{Path(track).name}: {exc}")
+            else:
+                self.metadata.discard(track)
+        self.populate_table(table, self.current_playlist())
+        if failures:
+            shown = "\n".join(failures[:10])
+            more = "" if len(failures) <= 10 else f"\n...and {len(failures) - 10} more"
+            QMessageBox.warning(self, "Tag write failed", f"Could not update:\n{shown}{more}")
 
     def scan_for_audio_files(self, paths: List[str]) -> List[str]:
         """Expand dropped folders into audio files, reporting progress for big trees."""

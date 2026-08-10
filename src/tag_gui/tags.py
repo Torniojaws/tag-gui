@@ -98,6 +98,21 @@ def read_custom_tag_states(path: Path, tag_names: Iterable[str]) -> Dict[str, bo
     return {tag: custom_tag_checked(audio, tag) for tag in tag_names}
 
 
+def set_standard_tags(path: Path, values: Dict[str, str]) -> None:
+    """Write only the given easy-tag keys, leaving every other tag untouched."""
+    audio = load_easy_tags(path)
+    if audio is None:
+        raise ValueError("unsupported or unreadable file")
+    if audio.tags is None:
+        audio.add_tags()
+    for key, value in values.items():
+        if value:
+            audio[key] = [value]
+        elif key in audio:
+            del audio[key]
+    audio.save()
+
+
 def set_custom_tag(path: Path, tag_name: str, checked: bool):
     audio = load_raw_tags(path)
     if audio is None:
