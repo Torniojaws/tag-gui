@@ -47,6 +47,8 @@ from .constants import (
     PLAYLIST_FILE_FILTER,
     POPULATE_BATCH,
     PREV_BUTTON_GLYPH,
+    PROGRESS_HEIGHT,
+    PROGRESS_STYLE,
     PROGRESS_THRESHOLD,
     SELECTION_STYLE,
     SONG_COLUMN,
@@ -185,6 +187,8 @@ class MainWindow(QMainWindow):
 
         self.progress = SeekSlider(Qt.Horizontal)
         self.progress.setRange(0, 0)
+        self.progress.setFixedHeight(PROGRESS_HEIGHT)
+        self.progress.setStyleSheet(PROGRESS_STYLE)
         self.progress.sliderMoved.connect(self.player.setPosition)
         self.progress_label = QLabel("00:00 / 00:00")
 
@@ -205,10 +209,10 @@ class MainWindow(QMainWindow):
         self.update_mute_icon(False)
 
         progress_layout = QHBoxLayout()
-        progress_layout.addWidget(self.volume_slider)
-        progress_layout.addWidget(self.mute_btn)
+        progress_layout.addWidget(self.volume_slider, 0, Qt.AlignVCenter)
+        progress_layout.addWidget(self.mute_btn, 0, Qt.AlignVCenter)
         progress_layout.addWidget(self.progress)
-        progress_layout.addWidget(self.progress_label)
+        progress_layout.addWidget(self.progress_label, 0, Qt.AlignVCenter)
 
         tags_layout = QHBoxLayout()
         tags_layout.addWidget(self.tags_input)

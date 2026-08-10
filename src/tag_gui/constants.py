@@ -34,6 +34,13 @@ VOLUME_SLIDER_WIDTH = 120
 MUTE_BUTTON_SIZE = 28
 MUTE_ICON_SIZE = 18
 MUTE_ICON_COLOR = "#b04a45"
+PROGRESS_HEIGHT = 48
+PROGRESS_STYLE = """
+QSlider::groove:horizontal { height: 48px; background: #cfcfcf; border-radius: 4px; }
+QSlider::sub-page:horizontal { background: #5a67a3; border-radius: 4px; }
+QSlider::add-page:horizontal { background: #cfcfcf; border-radius: 4px; }
+QSlider::handle:horizontal { width: 0px; margin: 0; background: transparent; border: none; }
+"""
 DEFAULT_COLUMNS = ["Artist", "Duration", "Song", "Year", "Album"]
 # Editable standard columns, paired with their mutagen easy-tag key. Duration is derived.
 STANDARD_TAG_FIELDS = (("Artist", "artist"), ("Song", "title"), ("Year", "date"), ("Album", "album"))
