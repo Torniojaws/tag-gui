@@ -1,8 +1,10 @@
-# tag-gui
+# Tag GUI
+
+Tag GUI for audio file tagging, including custom tags that are configurable in the UI.
+
+This is almost entirely AI-generated, so no warranty :D
 
 [![Tests and build](https://github.com/Torniojaws/tag-gui/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/Torniojaws/tag-gui/actions/workflows/build.yml)
-
-Tag GUI for audio files
 
 ## Run
 
