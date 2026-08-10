@@ -36,19 +36,24 @@ def icon() -> None:
 
 
 def build() -> None:
-    icon()
+    if WINDOWS:
+        icon()
     if EXE.exists():
         try:
             EXE.unlink()
         except PermissionError:
             # Windows locks a running executable, and PyInstaller only fails once it is done.
             raise SystemExit(f"{EXE} is in use - close the running app and build again")
-    run(
+    args = [
         PYTHON, "-m", "PyInstaller",
         "--noconfirm", "--clean", "--onefile", "--windowed",
         "--paths", "src",
-        "--icon", ICON.name, "--name", APP, "app.py",
-    )
+    ]
+    if WINDOWS:
+        # PyInstaller only embeds an .ico into the executable on Windows.
+        args += ["--icon", ICON.name]
+    args += ["--name", APP, "app.py"]
+    run(*args)
 
 
 def run_app() -> None:

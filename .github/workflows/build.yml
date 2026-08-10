@@ -13,10 +13,32 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  windows:
-    runs-on: windows-latest
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      value: ${{ steps.version.outputs.value }}
+    steps:
+      - id: version
+        run: echo "value=$(date -u +%Y%m%d%H%M)" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: version
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            built: dist/tag-gui.exe
+            asset: tag-gui-${{ needs.version.outputs.value }}.exe
+          - os: ubuntu-latest
+            built: dist/tag-gui
+            asset: tag-gui-${{ needs.version.outputs.value }}-linux
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
     env:
-      # make_icon.py needs a Qt platform plugin, and the runner has no display.
+      # make_icon.py needs a Qt platform plugin, and the runners have no display.
       QT_QPA_PLATFORM: offscreen
     steps:
       - uses: actions/checkout@v4
@@ -26,9 +48,14 @@ jobs:
           python-version: '3.14'
           cache: pip
 
-      - name: Compute version
-        id: version
-        run: echo "value=$(Get-Date -Format 'yyyyMMddHHmm')" >> $env:GITHUB_OUTPUT
+      - name: Install Qt system libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libegl1 libgl1 libglib2.0-0 libdbus-1-3 libxkbcommon0 libxkbcommon-x11-0 \
+            libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 \
+            libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 libxcb-xkb1
 
       - name: Install dependencies
         run: python build.py deps
@@ -37,19 +64,30 @@ jobs:
         run: python build.py build
 
       - name: Name executable after the build time
-        run: Move-Item dist\tag-gui.exe dist\tag-gui-${{ steps.version.outputs.value }}.exe
+        run: mv "${{ matrix.built }}" "dist/${{ matrix.asset }}"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: tag-gui-${{ steps.version.outputs.value }}
-          path: dist/tag-gui-${{ steps.version.outputs.value }}.exe
+          name: ${{ matrix.asset }}
+          path: dist/${{ matrix.asset }}
+          if-no-files-found: error
+
+  release:
+    needs: [version, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
 
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.version.outputs.value }}
         run: >
-          gh release create "v${{ steps.version.outputs.value }}"
-          "dist/tag-gui-${{ steps.version.outputs.value }}.exe"
-          --title "tag-gui ${{ steps.version.outputs.value }}"
-          --notes "Automated Windows build from ${{ github.sha }}."
+          gh release create "v$VERSION" dist/*
+          --repo "$GITHUB_REPOSITORY"
+          --title "tag-gui $VERSION"
+          --notes "Automated Windows and Linux builds from $GITHUB_SHA."
           --latest

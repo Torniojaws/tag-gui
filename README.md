@@ -47,9 +47,10 @@ installation. PyInstaller is not a cross-compiler, so build on the platform you 
 ## Automated builds
 
 Every push to `main` runs [.github/workflows/build.yml](.github/workflows/build.yml), which builds
-the Windows executable and publishes it as a release tagged with the build time, e.g. `v202608101505`
-containing `tag-gui-202608101505.exe`. Releases are linked from the repository front page; the same
-file is also attached to the workflow run as an artifact.
+the executable on Windows and Linux and publishes both as a release tagged with the build time,
+e.g. `v202608101505` containing `tag-gui-202608101505.exe` and `tag-gui-202608101505-linux`.
+Releases are linked from the repository front page; the same files are also attached to the
+workflow run as artifacts.
 
 ## Features
 
