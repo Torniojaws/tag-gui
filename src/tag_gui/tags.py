@@ -1,0 +1,120 @@
+import unicodedata
+from pathlib import Path
+from typing import List
+
+from mutagen import File as MutagenFile
+from mutagen.id3 import ID3, TXXX
+
+from .utils import seconds_to_mmss
+
+
+def parse_custom_tags(text: str) -> List[str]:
+    tags = []
+    seen = set()
+    for part in text.split(","):
+        t = unicodedata.normalize("NFC", part.strip())
+        key = normalize_tag_name(t)
+        if t and key not in seen:
+            seen.add(key)
+            tags.append(t)
+    return tags
+
+
+def ascii_tag_key(name: str) -> str:
+    """Tag names are shown as typed but stored as ASCII, so "Yömusa" is written as "Yomusa"."""
+    key = []
+    for char in unicodedata.normalize("NFKD", str(name).strip()):
+        if unicodedata.combining(char):
+            continue
+        key.append(char if " " <= char <= "}" and char != "=" else "_")
+    return "".join(key)
+
+
+def normalize_tag_name(name: str) -> str:
+    return ascii_tag_key(name).casefold()
+
+
+def load_easy_tags(path: Path):
+    try:
+        return MutagenFile(str(path), easy=True)
+    except Exception:
+        return None
+
+
+def load_raw_tags(path: Path):
+    try:
+        return MutagenFile(str(path), easy=False)
+    except Exception:
+        return None
+
+
+def get_field(tags, key: str) -> str:
+    if not tags:
+        return ""
+    values = tags.get(key)
+    if not values:
+        return ""
+    value = values[0]
+    return str(value)
+
+
+def get_duration(path: Path) -> str:
+    audio = load_raw_tags(path)
+    if audio is None or not getattr(audio, "info", None):
+        return "00:00"
+    return seconds_to_mmss(getattr(audio.info, "length", 0))
+
+
+def get_tag_values_case_insensitive(tags, target: str):
+    target_n = normalize_tag_name(target)
+    for key, values in tags.items():
+        if normalize_tag_name(str(key)) == target_n:
+            return key, values
+    return None, None
+
+
+def custom_tag_checked(path: Path, tag_name: str) -> bool:
+    audio = load_raw_tags(path)
+    # A tagless file is falsy in mutagen, so compare against None explicitly.
+    if audio is None or not audio.tags:
+        return False
+
+    if isinstance(audio.tags, ID3):
+        for frame in audio.tags.getall("TXXX"):
+            if normalize_tag_name(frame.desc) == normalize_tag_name(tag_name):
+                values = [str(v) for v in frame.text]
+                if any(v == "X" for v in values):
+                    return True
+        return False
+
+    key, values = get_tag_values_case_insensitive(audio.tags, tag_name)
+    if not key or not values:
+        return False
+    return any(str(v) == "X" for v in values)
+
+
+def set_custom_tag(path: Path, tag_name: str, checked: bool):
+    audio = load_raw_tags(path)
+    if audio is None:
+        return
+
+    tag_name = ascii_tag_key(tag_name)
+
+    if audio.tags is None:
+        audio.add_tags()
+
+    if isinstance(audio.tags, ID3):
+        for frame in list(audio.tags.getall("TXXX")):
+            if normalize_tag_name(frame.desc) == normalize_tag_name(tag_name):
+                audio.tags.delall(f"TXXX:{frame.desc}")
+        if checked:
+            audio.tags.add(TXXX(encoding=3, desc=tag_name, text=["X"]))
+        audio.save()
+        return
+
+    existing_key, _ = get_tag_values_case_insensitive(audio.tags, tag_name)
+    if existing_key is not None:
+        del audio.tags[existing_key]
+    if checked:
+        audio.tags[tag_name] = ["X"]
+    audio.save()

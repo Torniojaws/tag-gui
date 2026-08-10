@@ -9,7 +9,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 APP = "tag-gui"
 ICON = ROOT / f"{APP}.ico"
-ICON_SOURCES = ("make_icon.py", "app.py")
+ICON_SOURCES = ("make_icon.py", "app.py", "src/tag_gui/icons.py", "src/tag_gui/constants.py")
 WINDOWS = sys.platform == "win32"
 EXE = ROOT / "dist" / (f"{APP}.exe" if WINDOWS else APP)
 
@@ -40,6 +40,7 @@ def build() -> None:
     run(
         PYTHON, "-m", "PyInstaller",
         "--noconfirm", "--clean", "--onefile", "--windowed",
+        "--paths", "src",
         "--icon", ICON.name, "--name", APP, "app.py",
     )
 

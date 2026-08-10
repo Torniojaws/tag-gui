@@ -8,16 +8,27 @@ pip install -r requirements.txt
 python app.py
 ```
 
+## Layout
+
+```
+app.py                     entry point (adds src/ to sys.path, calls tag_gui.main)
+make_icon.py               writes tag-gui.ico
+build.py / build.cmd       build tasks
+src/tag_gui/
+    constants.py           columns, icon sizes, selection stylesheet
+    utils.py               app data dir, mm:ss formatting
+    icons.py               note pixmap/icon drawing
+    models.py              Playlist dataclass
+    tags.py                mutagen reads/writes, custom tag normalization
+    widgets.py             SeekSlider, TagCheckItem, PlaylistTable
+    main_window.py         MainWindow
+    main.py                QApplication setup
+```
+
 ## Build a standalone executable
 
-[`build.py`](build.py) runs the build steps in sequence and needs nothing but Python:
+[`python build.py`](build.py) runs the build steps in sequence and needs nothing but Python:
 
-```powershell
-.\build deps      # requirements.txt + pyinstaller
-.\build           # regenerates tag-gui.ico when needed, then packages the app
-.\build run       # runs the built executable (use `.\build build run` to do both)
-.\build clean
-```
 
 `.\build` is the [`build.cmd`](build.cmd) wrapper; PowerShell requires the `.\` prefix, `cmd.exe`
 does not. On macOS/Linux run `python build.py <task>` instead.
@@ -45,5 +56,6 @@ installation. PyInstaller is not a cross-compiler, so build on the platform you 
 - Custom tag value `X` means checked; unchecking removes the tag from the file, checking writes it back
 - Sortable/resizable columns with horizontal scrolling
 - Tabbed M3U playlists persisted between sessions (`default.m3u`, `default1.m3u`, ...)
-- Double-click tab bar to create the next default playlist
+- Add Playlist button, or right-click the tab bar for Add / Remove playlist (removal asks first and deletes the `.m3u`)
+- Double-click empty tab bar space to create the next default playlist
 - Rename/Save As for playlist name and `.m3u` filename

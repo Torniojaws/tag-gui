@@ -7,7 +7,10 @@ from pathlib import Path
 from PySide6.QtCore import QBuffer
 from PySide6.QtWidgets import QApplication
 
-from app import ICON_SIZES, note_pixmap
+sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
+
+from tag_gui.constants import ICON_SIZES  # noqa: E402
+from tag_gui.icons import note_pixmap  # noqa: E402
 
 OUTPUT = Path(__file__).with_name("tag-gui.ico")
 
