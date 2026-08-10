@@ -468,6 +468,7 @@ class MainWindow(QMainWindow):
             return
 
         failures = []
+        updated = []
         for track in tracks:
             try:
                 set_standard_tags(Path(track), values)
@@ -475,11 +476,38 @@ class MainWindow(QMainWindow):
                 failures.append(f"{Path(track).name}: {exc}")
             else:
                 self.metadata.discard(track)
-        self.populate_table(table, self.current_playlist())
+                updated.append(track)
+        self.refresh_tracks(table, updated)
         if failures:
             shown = "\n".join(failures[:10])
             more = "" if len(failures) <= 10 else f"\n...and {len(failures) - 10} more"
             QMessageBox.warning(self, "Tag write failed", f"Could not update:\n{shown}{more}")
+
+    def refresh_tracks(self, table: PlaylistTable, tracks: List[str]):
+        """Re-read only the given tracks instead of rebuilding the whole table."""
+        if not tracks:
+            return
+        rows = {}
+        for row in range(table.rowCount()):
+            item = table.item(row, 0)
+            track = item.data(Qt.UserRole) if item else None
+            if track:
+                rows[track] = row
+
+        self._updating_table = True
+        try:
+            for track in tracks:
+                row = rows.get(track)
+                if row is None:
+                    continue
+                info = self.metadata.get(track, self.custom_tags)
+                for col, value in enumerate(info.fields):
+                    item = table.item(row, col)
+                    if item:
+                        item.setText(value)
+        finally:
+            self._updating_table = False
+        table.apply_album_colors()
 
     def scan_for_audio_files(self, paths: List[str]) -> List[str]:
         """Expand dropped folders into audio files, reporting progress for big trees."""
