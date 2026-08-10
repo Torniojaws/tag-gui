@@ -25,8 +25,11 @@ from PySide6.QtWidgets import (
 )
 
 from .constants import (
+    APP_TITLE,
     AUDIO_FILE_FILTER,
     DEFAULT_COLUMNS,
+    PAUSE_GLYPH,
+    PLAY_GLYPH,
     POPULATE_BATCH,
     PROGRESS_THRESHOLD,
     SELECTION_STYLE,
@@ -41,7 +44,7 @@ from .widgets import PlaylistTable, SeekSlider, TagCheckItem
 class MainWindow(QMainWindow):
     def __init__(self, splash=None):
         super().__init__()
-        self.setWindowTitle("Tag GUI")
+        self.setWindowTitle(APP_TITLE)
         self.data_dir = app_data_dir()
         self.custom_tags_file = self.data_dir / "custom_tags.txt"
         self.playlists_file = self.data_dir / "playlists.json"
@@ -60,6 +63,7 @@ class MainWindow(QMainWindow):
         self.player.positionChanged.connect(self.on_position_changed)
         self.player.durationChanged.connect(self.on_duration_changed)
         self.player.mediaStatusChanged.connect(self.on_media_status_changed)
+        self.player.playbackStateChanged.connect(self.on_playback_state_changed)
 
         self.tabs = QTabWidget()
         self.tabs.setMovable(True)
@@ -479,6 +483,26 @@ class MainWindow(QMainWindow):
         self.player.setSource(QUrl.fromLocalFile(file_path))
         self.player.play()
         table.selectRow(row)
+
+    def playing_title(self, file_path: str) -> str:
+        info = self.metadata.get(file_path, self.custom_tags)
+        artist, song = info.fields[0], info.fields[1]
+        if song == Path(file_path).stem:
+            # track_fields falls back to the stem, so the file carries no title tag.
+            song = Path(file_path).name
+        return f"{artist} - {song}" if artist else song
+
+    def on_playback_state_changed(self, state):
+        source = self.player.source().toLocalFile()
+        if not source:
+            self.setWindowTitle(APP_TITLE)
+            return
+        if state == QMediaPlayer.PlayingState:
+            self.setWindowTitle(f"{APP_TITLE} - {PLAY_GLYPH} Playing: {self.playing_title(source)}")
+        elif state == QMediaPlayer.PausedState:
+            self.setWindowTitle(f"{APP_TITLE} - {PAUSE_GLYPH} Paused: {self.playing_title(source)}")
+        else:
+            self.setWindowTitle(APP_TITLE)
 
     def play_current_or_selected(self):
         table = self.current_table()

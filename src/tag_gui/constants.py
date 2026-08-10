@@ -1,5 +1,8 @@
 AUDIO_EXTENSIONS = {".mp3", ".flac", ".fla", ".wma", ".aac"}
 AUDIO_FILE_FILTER = "Audio files (*.mp3 *.flac *.fla *.wma *.aac)"
+APP_TITLE = "Tag GUI"
+PLAY_GLYPH = "\u25b6"
+PAUSE_GLYPH = "\u23f8"
 DEFAULT_COLUMNS = ["Artist", "Song", "Album", "Year", "Duration"]
 ICON_SIZES = (16, 24, 32, 48, 64, 128, 256)
 APP_ID = "tag-gui.tag-gui"
