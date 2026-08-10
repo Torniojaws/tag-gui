@@ -63,6 +63,7 @@ file is also attached to the workflow run as an artifact.
 - Custom checkbox-tag columns via comma-separated textbox (persisted in `custom_tags.txt` under app data)
 - Tag names are displayed as typed but stored as ASCII (`Yömusa` is written to files as `Yomusa`)
 - Custom tag value `X` means checked; unchecking removes the tag from the file, checking writes it back
+- Rows are shaded per album run: the shade flips whenever the album changes, so consecutive tracks of one album share a background
 - Sortable/resizable columns with horizontal scrolling; a header click sorts descending first (checked tags on top) and scrolls back to the top
 - Splash screen with a progress bar while playlists load at startup
 - Tags read from files are cached in `metadata.json` under app data and reused until a file's timestamp changes, so restarts do not re-read every file

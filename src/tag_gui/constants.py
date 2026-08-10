@@ -31,6 +31,10 @@ ACTIONS_WIDTH_SHARE = 0.25
 DEFAULT_COLUMNS = ["Artist", "Song", "Album", "Year", "Duration"]
 # Editable standard columns, paired with their mutagen easy-tag key. Duration is derived.
 STANDARD_TAG_FIELDS = (("Artist", "artist"), ("Song", "title"), ("Album", "album"), ("Year", "date"))
+ALBUM_COLUMN = DEFAULT_COLUMNS.index("Album")
+# Second shade for alternating album runs, picked per theme lightness.
+ALBUM_TINT_LIGHT = (232, 238, 247)
+ALBUM_TINT_DARK = (38, 44, 56)
 ICON_SIZES = (16, 24, 32, 48, 64, 128, 256)
 APP_ID = "tag-gui.tag-gui"
 # Rows are filled in chunks of this size so the progress dialog stays responsive.

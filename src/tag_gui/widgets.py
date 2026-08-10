@@ -1,9 +1,10 @@
 from pathlib import Path
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import QAbstractItemView, QSlider, QTableWidget, QTableWidgetItem
 
-from .constants import AUDIO_EXTENSIONS
+from .constants import ALBUM_COLUMN, ALBUM_TINT_DARK, ALBUM_TINT_LIGHT, AUDIO_EXTENSIONS
 
 
 class SeekSlider(QSlider):
@@ -48,11 +49,35 @@ class PlaylistTable(QTableWidget):
         self._sort_order = order
         self.horizontalHeader().setSortIndicator(column, order)
         self.sortItems(column, order)
+        self.apply_album_colors()
         self.scrollToTop()
 
     def reapply_sort(self):
         if self._sort_column >= 0:
             self.sortItems(self._sort_column, self._sort_order)
+
+    def apply_album_colors(self):
+        """Shade consecutive rows of one album alike, flipping shade at every album change."""
+        base = self.palette().base().color()
+        tint = ALBUM_TINT_LIGHT if base.lightness() > 128 else ALBUM_TINT_DARK
+        brushes = (QBrush(base), QBrush(QColor(*tint)))
+        shade = 0
+        previous = None
+        # Painting backgrounds would otherwise emit itemChanged for every custom tag cell.
+        self.blockSignals(True)
+        try:
+            for row in range(self.rowCount()):
+                album_item = self.item(row, ALBUM_COLUMN)
+                album = album_item.text() if album_item else ""
+                if previous is not None and album != previous:
+                    shade = 1 - shade
+                previous = album
+                for col in range(self.columnCount()):
+                    cell = self.item(row, col)
+                    if cell:
+                        cell.setBackground(brushes[shade])
+        finally:
+            self.blockSignals(False)
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Delete and not event.modifiers():

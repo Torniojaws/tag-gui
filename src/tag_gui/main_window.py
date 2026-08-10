@@ -372,6 +372,7 @@ class MainWindow(QMainWindow):
                     item.setData(Qt.UserRole + 1, tag)
                     table.setItem(row, col, item)
             table.reapply_sort()
+            table.apply_album_colors()
             table.resizeColumnsToContents()
         finally:
             finish()
