@@ -1,30 +1,24 @@
 from pathlib import Path
 
-from PySide6.QtCore import QEvent, QRect, Qt, Signal
-from PySide6.QtGui import QBrush, QColor, QPainter
+from PySide6.QtCore import QEvent, QRect, Qt
+from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
-    QLineEdit,
-    QSlider,
+    QHeaderView,
     QStyle,
     QStyledItemDelegate,
     QStyleOptionButton,
     QStyleOptionViewItem,
-    QTabBar,
     QTableWidget,
     QTableWidgetItem,
-    QTabWidget,
 )
 
-from .constants import (
-    ALBUM_COLUMN,
-    ALBUM_TINT_DARK,
-    ALBUM_TINT_LIGHT,
-    AUDIO_EXTENSIONS,
-    PROGRESS_TEXT_ON_FILL,
-    PROGRESS_TEXT_ON_REST,
-)
+from ..constants import ALBUM_COLUMN, AUDIO_EXTENSIONS
+from .styles import ALBUM_TINT_DARK, ALBUM_TINT_LIGHT, SELECTION_STYLE
+
+# Rows that auto-size against every entry are too slow for large playlists.
+RESIZE_SAMPLE_ROWS = 50
 
 
 def is_checked(index) -> bool:
@@ -33,67 +27,11 @@ def is_checked(index) -> bool:
     return state is not None and Qt.CheckState(state) == Qt.Checked
 
 
-class PlaylistTabBar(QTabBar):
-    """Tab bar whose labels can be renamed in place."""
-
-    name_edited = Signal(int, str)
-    middle_clicked = Signal(int)
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self._editing_index = -1
-        self._editor = QLineEdit(self)
-        self._editor.hide()
-        self._editor.installEventFilter(self)
-        self._editor.editingFinished.connect(self.commit_edit)
-
-    def edit_tab(self, index: int):
-        if index < 0:
-            return
-        self._editing_index = index
-        self._editor.setText(self.tabText(index))
-        self._editor.setGeometry(self.tabRect(index))
-        self._editor.selectAll()
-        self._editor.show()
-        self._editor.setFocus()
-
-    def commit_edit(self):
-        if self._editing_index < 0:
-            return
-        index, self._editing_index = self._editing_index, -1
-        self._editor.hide()
-        name = self._editor.text().strip()
-        if name and name != self.tabText(index):
-            self.name_edited.emit(index, name)
-
-    def cancel_edit(self):
-        self._editing_index = -1
-        self._editor.hide()
-
-    def eventFilter(self, watched, event):
-        if watched is self._editor and event.type() == QEvent.KeyPress and event.key() == Qt.Key_Escape:
-            self.cancel_edit()
-            return True
-        return super().eventFilter(watched, event)
-
-    def mouseReleaseEvent(self, event):
-        if event.button() == Qt.MiddleButton:
-            index = self.tabAt(event.position().toPoint())
-            if index != -1:
-                self.middle_clicked.emit(index)
-                return
-        super().mouseReleaseEvent(event)
-
-
-class PlaylistTabs(QTabWidget):
-    """The strip right of the tabs belongs to the tab widget, so the tab bar never sees
-    double-clicks there."""
-
-    empty_double_clicked = Signal()
-
-    def mouseDoubleClickEvent(self, event):
-        self.empty_double_clicked.emit()
-        super().mouseDoubleClickEvent(event)
+class TagCheckItem(QTableWidgetItem):
+    def __lt__(self, other):
+        if isinstance(other, QTableWidgetItem):
+            return int(self.checkState() == Qt.Checked) < int(other.checkState() == Qt.Checked)
+        return super().__lt__(other)
 
 
 class CenteredCheckDelegate(QStyledItemDelegate):
@@ -139,48 +77,6 @@ class CenteredCheckDelegate(QStyledItemDelegate):
         return False
 
 
-class SeekSlider(QSlider):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._text = ""
-
-    def set_text(self, text: str):
-        if text != self._text:
-            self._text = text
-            self.update()
-
-    def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton:
-            value = self.minimum() + ((self.maximum() - self.minimum()) * event.pos().x()) / max(1, self.width())
-            self.setValue(int(value))
-            self.sliderMoved.emit(int(value))
-        super().mousePressEvent(event)
-
-    def paintEvent(self, event):
-        super().paintEvent(event)
-        if not self._text:
-            return
-        span = self.maximum() - self.minimum()
-        filled = 0 if span <= 0 else round(self.width() * (self.value() - self.minimum()) / span)
-        painter = QPainter(self)
-        # Drawn twice and clipped, so the text stays readable over both halves of the bar.
-        for color, clip in (
-            (PROGRESS_TEXT_ON_FILL, QRect(0, 0, filled, self.height())),
-            (PROGRESS_TEXT_ON_REST, QRect(filled, 0, self.width() - filled, self.height())),
-        ):
-            painter.setPen(QColor(color))
-            painter.setClipRect(clip)
-            painter.drawText(self.rect(), Qt.AlignCenter, self._text)
-        painter.end()
-
-
-class TagCheckItem(QTableWidgetItem):
-    def __lt__(self, other):
-        if isinstance(other, QTableWidgetItem):
-            return int(self.checkState() == Qt.Checked) < int(other.checkState() == Qt.Checked)
-        return super().__lt__(other)
-
-
 class PlaylistTable(QTableWidget):
     def __init__(self, on_files_dropped, on_delete_pressed, parent=None):
         super().__init__(parent)
@@ -188,15 +84,25 @@ class PlaylistTable(QTableWidget):
         self.on_delete_pressed = on_delete_pressed
         self.setAcceptDrops(True)
         self.setDragDropMode(QAbstractItemView.DropOnly)
+        self.setHorizontalScrollMode(QAbstractItemView.ScrollPerPixel)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.setStyleSheet(SELECTION_STYLE)
+        self.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.setItemDelegate(CenteredCheckDelegate(self))
+        self.horizontalHeader().setSectionsMovable(False)
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
+        self.horizontalHeader().setResizeContentsPrecision(RESIZE_SAMPLE_ROWS)
+        self.verticalHeader().setVisible(False)
 
         # Sorting is driven from sectionClicked instead of setSortingEnabled so that a
         # newly clicked column starts descending, putting checked tags on top.
         self._sort_column = -1
         self._sort_order = Qt.DescendingOrder
-        header = self.horizontalHeader()
-        header.setSectionsClickable(True)
-        header.setSortIndicatorShown(True)
-        header.sectionClicked.connect(self.sort_by_column)
+        self.horizontalHeader().setSectionsClickable(True)
+        self.horizontalHeader().setSortIndicatorShown(True)
+        self.horizontalHeader().sectionClicked.connect(self.sort_by_column)
 
     def sort_by_column(self, column: int):
         if column == self._sort_column and self._sort_order == Qt.DescendingOrder:

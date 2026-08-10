@@ -1,7 +1,7 @@
 from PySide6.QtCore import QPointF, QRectF, Qt
 from PySide6.QtGui import QColor, QFont, QIcon, QPainter, QPen, QPixmap, QPolygonF
 
-from .constants import ICON_SIZES
+from ..constants import ICON_SIZES
 
 
 def note_pixmap(size: int) -> QPixmap:

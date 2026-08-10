@@ -1,48 +1,14 @@
+"""Data rules: file types, columns and batching. Visual constants live in ui/styles.py."""
+
+APP_ID = "tag-gui.tag-gui"
+APP_TITLE = "Tag GUI"
+
 AUDIO_EXTENSIONS = {".mp3", ".flac", ".fla", ".wma", ".aac"}
 AUDIO_FILE_FILTER = "Audio files (*.mp3 *.flac *.fla *.wma *.aac)"
 PLAYLIST_FILE_FILTER = "Playlists (*.m3u *.m3u8)"
-APP_TITLE = "Tag GUI"
-PLAY_GLYPH = "\u25b6"
-PAUSE_GLYPH = "\u23f8"
-# Geometric shapes render in the default UI font, unlike the media control emoji.
-PREV_BUTTON_GLYPH = "\u25c0\u25c0"
-NEXT_BUTTON_GLYPH = "\u25b6\u25b6"
-STOP_BUTTON_GLYPH = "\u25a0"
-PLAY_BUTTON_GLYPH = "\u25b6"
-PAUSE_BUTTON_GLYPH = "\u275a\u275a"
-PLAY_BUTTON_STYLE = """
-QPushButton { background-color: #4c7a55; color: #ffffff; border: none; border-radius: 6px; }
-QPushButton:hover { background-color: #578a61; }
-QPushButton:pressed { background-color: #3f6748; }
-"""
-PAUSE_BUTTON_STYLE = """
-QPushButton { background-color: #9a8340; color: #ffffff; border: none; border-radius: 6px; }
-QPushButton:hover { background-color: #ab9349; }
-QPushButton:pressed { background-color: #837036; }
-"""
-STOP_BUTTON_STYLE = """
-QPushButton { background-color: #8a4b47; color: #ffffff; border: none; border-radius: 6px; }
-QPushButton:hover { background-color: #9a5852; }
-QPushButton:pressed { background-color: #75403c; }
-"""
-# Transport buttons are square and sized from the screen height; actions get a share of its width.
-TRANSPORT_BUTTON_SCALE = 0.05
-TRANSPORT_BUTTON_RANGE = (36, 72)
-ACTIONS_WIDTH_SHARE = 0.25
-VOLUME_DEFAULT = 75
-VOLUME_SLIDER_WIDTH = 120
-MUTE_BUTTON_SIZE = 28
-MUTE_ICON_SIZE = 18
-MUTE_ICON_COLOR = "#b04a45"
-PROGRESS_HEIGHT = 48
-PROGRESS_STYLE = """
-QSlider::groove:horizontal { height: 48px; background: #cfcfcf; border-radius: 4px; }
-QSlider::sub-page:horizontal { background: #5a67a3; border-radius: 4px; }
-QSlider::add-page:horizontal { background: #cfcfcf; border-radius: 4px; }
-QSlider::handle:horizontal { width: 0px; margin: 0; background: transparent; border: none; }
-"""
-PROGRESS_TEXT_ON_FILL = "#ffffff"
-PROGRESS_TEXT_ON_REST = "#333333"
+
+ICON_SIZES = (16, 24, 32, 48, 64, 128, 256)
+
 DEFAULT_COLUMNS = ["Artist", "Duration", "Song", "Year", "Album"]
 # Editable standard columns, paired with their mutagen easy-tag key. Duration is derived.
 STANDARD_TAG_FIELDS = (("Artist", "artist"), ("Song", "title"), ("Year", "date"), ("Album", "album"))
@@ -51,23 +17,13 @@ SONG_COLUMN = DEFAULT_COLUMNS.index("Song")
 ALBUM_COLUMN = DEFAULT_COLUMNS.index("Album")
 YEAR_COLUMN = DEFAULT_COLUMNS.index("Year")
 DURATION_COLUMN = DEFAULT_COLUMNS.index("Duration")
+# The column whose items carry the file path in Qt.UserRole.
+PATH_COLUMN = 0
 LEFT_ALIGNED_HEADERS = tuple(
     DEFAULT_COLUMNS.index(name) for name in ("Artist", "Duration", "Song", "Album")
 )
-# Duration only ever shows mm:ss, so it does not need content-based sizing.
-DURATION_COLUMN_PADDING = 24
-# Second shade for alternating album runs, picked per theme lightness.
-ALBUM_TINT_LIGHT = (232, 238, 247)
-ALBUM_TINT_DARK = (38, 44, 56)
-ICON_SIZES = (16, 24, 32, 48, 64, 128, 256)
-APP_ID = "tag-gui.tag-gui"
+
 # Rows are filled in chunks of this size so the progress dialog stays responsive.
 POPULATE_BATCH = 25
 # Reading tags is slow, so only show progress once a playlist is this big.
 PROGRESS_THRESHOLD = 100
-# Explicit background/text pair so selected rows stay readable under light and dark themes.
-SELECTION_STYLE = """
-QTableView { selection-background-color: #5a67a3; selection-color: #ffffff; }
-QTableView::item:selected { background: #5a67a3; color: #ffffff; }
-QTableView::item:selected:!active { background: #5a67a3; color: #ffffff; }
-"""

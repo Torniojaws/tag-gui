@@ -10,7 +10,7 @@ from PySide6.QtWidgets import QApplication
 sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
 
 from tag_gui.constants import ICON_SIZES  # noqa: E402
-from tag_gui.icons import note_pixmap  # noqa: E402
+from tag_gui.ui.icons import note_pixmap  # noqa: E402
 
 OUTPUT = Path(__file__).with_name("tag-gui.ico")
 

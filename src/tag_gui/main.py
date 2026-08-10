@@ -3,7 +3,7 @@ import sys
 from PySide6.QtWidgets import QApplication
 
 from .constants import APP_ID
-from .splash import Splash
+from .ui.splash import Splash
 
 
 def main():
@@ -17,8 +17,8 @@ def main():
     splash.show_centered()
 
     # Imported here so the splash is on screen before mutagen and QtMultimedia load.
-    from .icons import note_icon
-    from .main_window import MainWindow
+    from .ui.icons import note_icon
+    from .ui.main_window import MainWindow
 
     app.setWindowIcon(note_icon())
     win = MainWindow(splash=splash)

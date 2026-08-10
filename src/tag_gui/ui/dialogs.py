@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from .constants import DEFAULT_COLUMNS, STANDARD_TAG_FIELDS
+from ..constants import DEFAULT_COLUMNS, STANDARD_TAG_FIELDS
 
 MULTIPLE_VALUES = "(multiple values)"
 

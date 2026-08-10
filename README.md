@@ -15,14 +15,28 @@ app.py                     entry point (adds src/ to sys.path, calls tag_gui.mai
 make_icon.py               writes tag-gui.ico
 build.py / build.cmd       build tasks
 src/tag_gui/
-    constants.py           columns, icon sizes, selection stylesheet
-    utils.py               app data dir, mm:ss formatting
-    icons.py               note pixmap/icon drawing
-    models.py              Playlist dataclass
-    tags.py                mutagen reads/writes, custom tag normalization
-    widgets.py             SeekSlider, TagCheckItem, PlaylistTable
-    main_window.py         MainWindow
+    constants.py           file types, columns, batching
     main.py                QApplication setup
+    core/                  no Qt widgets, only files, tags and playlists
+        models.py          Playlist dataclass
+        playlists.py       PlaylistStore: m3u read/write, state file, naming
+        tags.py            mutagen reads/writes, custom tag normalization
+        metadata.py        cached track fields and tag states
+        scanning.py        recursive audio file collection
+        utils.py           app data dir, slugify, mm:ss formatting
+    ui/
+        styles.py          colours, glyphs, sizes
+        sizing.py          screen-derived widget sizes
+        icons.py           note and speaker drawing
+        splash.py          startup window
+        dialogs.py         standard tag editor
+        table.py           PlaylistTable, check delegate, album shading
+        table_fill.py      filling and refreshing rows
+        tabs.py            renameable tab bar
+        sliders.py         seek bar with in-bar time text
+        transport.py       previous/play/stop/next
+        volume.py          volume slider and mute
+        main_window.py     wiring and interactions
 ```
 
 ## Build a standalone executable
