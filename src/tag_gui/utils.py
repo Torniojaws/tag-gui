@@ -1,9 +1,19 @@
 import os
+import re
 import sys
+import unicodedata
 from pathlib import Path
 from typing import Callable, Iterable, List, Optional
 
 from .constants import AUDIO_EXTENSIONS
+
+
+def slugify(name: str) -> str:
+    """ASCII kebab-case file name, so playlists keep working on any filesystem."""
+    decomposed = unicodedata.normalize("NFKD", name)
+    ascii_only = "".join(char for char in decomposed if not unicodedata.combining(char))
+    slug = re.sub(r"[^A-Za-z0-9]+", "-", ascii_only).strip("-").lower()
+    return slug or "playlist"
 
 
 def app_data_dir() -> Path:

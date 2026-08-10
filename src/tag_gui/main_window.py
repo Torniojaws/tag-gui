@@ -11,7 +11,6 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QHBoxLayout,
     QHeaderView,
-    QInputDialog,
     QLabel,
     QLineEdit,
     QMainWindow,
@@ -20,7 +19,6 @@ from PySide6.QtWidgets import (
     QProgressDialog,
     QPushButton,
     QTableWidgetItem,
-    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -41,6 +39,7 @@ from .constants import (
     PLAY_BUTTON_GLYPH,
     PLAY_BUTTON_STYLE,
     PLAY_GLYPH,
+    PLAYLIST_FILE_FILTER,
     POPULATE_BATCH,
     PREV_BUTTON_GLYPH,
     PROGRESS_THRESHOLD,
@@ -56,8 +55,15 @@ from .models import Playlist
 from .metadata import MetadataCache
 from .dialogs import StandardTagsDialog
 from .tags import parse_custom_tags, set_custom_tag, set_standard_tags
-from .utils import app_data_dir, collect_audio_files, seconds_to_mmss
-from .widgets import CenteredCheckDelegate, PlaylistTable, SeekSlider, TagCheckItem
+from .utils import app_data_dir, collect_audio_files, seconds_to_mmss, slugify
+from .widgets import (
+    CenteredCheckDelegate,
+    PlaylistTable,
+    PlaylistTabBar,
+    PlaylistTabs,
+    SeekSlider,
+    TagCheckItem,
+)
 
 
 def screen_size():
@@ -96,13 +102,19 @@ class MainWindow(QMainWindow):
         self.player.mediaStatusChanged.connect(self.on_media_status_changed)
         self.player.playbackStateChanged.connect(self.on_playback_state_changed)
 
-        self.tabs = QTabWidget()
+        self.tabs = PlaylistTabs()
+        self.tabs.setTabBar(PlaylistTabBar())
         self.tabs.setMovable(True)
+        self.tabs.empty_double_clicked.connect(self.add_playlist)
         self.tabs.tabBarDoubleClicked.connect(self.on_tabbar_double_clicked)
         self.tabs.currentChanged.connect(self.on_tab_changed)
         self.tabs.tabBar().setContextMenuPolicy(Qt.CustomContextMenu)
         self.tabs.tabBar().customContextMenuRequested.connect(self.on_tabbar_context_menu)
         self.tabs.tabBar().tabMoved.connect(self.on_tab_moved)
+        self.tabs.tabBar().name_edited.connect(self.rename_playlist_to)
+        self.tabs.tabBar().middle_clicked.connect(self.remove_playlist)
+        self.tabs.setTabsClosable(True)
+        self.tabs.tabCloseRequested.connect(self.remove_playlist)
 
         self.tags_input = QLineEdit()
         self.tags_input.setPlaceholderText("Custom checkbox tags (comma separated)")
@@ -115,16 +127,16 @@ class MainWindow(QMainWindow):
         self.stop_btn = QPushButton(STOP_BUTTON_GLYPH)
         self.next_btn = QPushButton(NEXT_BUTTON_GLYPH)
         self.add_btn = QPushButton("Add Files")
-        self.add_playlist_btn = QPushButton("Add Playlist")
-        self.rename_btn = QPushButton("Rename / Save As")
+        self.load_playlist_btn = QPushButton("Load Playlist")
+        self.save_as_btn = QPushButton("Save Playlist As")
 
         self.prev_btn.clicked.connect(self.play_previous)
         self.play_btn.clicked.connect(self.toggle_play_pause)
         self.stop_btn.clicked.connect(self.player.stop)
         self.next_btn.clicked.connect(self.play_next)
         self.add_btn.clicked.connect(self.add_files_dialog)
-        self.add_playlist_btn.clicked.connect(self.add_playlist)
-        self.rename_btn.clicked.connect(self.rename_playlist)
+        self.load_playlist_btn.clicked.connect(self.load_playlist_dialog)
+        self.save_as_btn.clicked.connect(self.save_playlist_as)
 
         transport = QHBoxLayout()
         transport.setSpacing(8)
@@ -147,7 +159,7 @@ class MainWindow(QMainWindow):
         actions = QWidget()
         actions_layout = QHBoxLayout(actions)
         actions_layout.setContentsMargins(0, 0, 0, 0)
-        for btn in (self.add_btn, self.add_playlist_btn, self.rename_btn):
+        for btn in (self.add_btn, self.load_playlist_btn, self.save_as_btn):
             actions_layout.addWidget(btn)
         geometry = screen_size()
         if geometry:
@@ -213,30 +225,80 @@ class MainWindow(QMainWindow):
 
     def on_tabbar_double_clicked(self, index):
         if index != -1:
+            self.tabs.tabBar().edit_tab(index)
+
+    def rename_playlist_to(self, index: int, new_name: str):
+        if not 0 <= index < len(self.playlists):
             return
-        self.add_playlist()
+        playlist = self.playlists[index]
+        new_name = new_name.strip()
+        if not new_name or new_name == playlist.name:
+            return
+        old_path = self.playlist_path(playlist)
+        playlist.name = new_name
+        slug = f"{slugify(new_name)}.m3u"
+        if old_path.parent == self.data_dir:
+            playlist.file_name = self.unique_file_name(slug, index)
+        else:
+            # A loaded playlist is renamed where it lives, not moved into the data dir.
+            playlist.file_name = str(old_path.with_name(slug))
+        self.tabs.setTabText(index, new_name)
+        self.save_state()
+        if self.playlist_path(playlist) != old_path and old_path.exists():
+            old_path.unlink()
+
+    def unique_file_name(self, candidate: str, skip_index: int) -> str:
+        used = {p.file_name.lower() for i, p in enumerate(self.playlists) if i != skip_index}
+        if candidate.lower() not in used:
+            return candidate
+        stem = candidate[: -len(".m3u")]
+        suffix = 2
+        while f"{stem}-{suffix}.m3u".lower() in used:
+            suffix += 1
+        return f"{stem}-{suffix}.m3u"
 
     def on_tabbar_context_menu(self, pos):
         tab_bar = self.tabs.tabBar()
         index = tab_bar.tabAt(pos)
         menu = QMenu(self)
         add_action = menu.addAction("Add playlist")
+        load_action = menu.addAction("Load playlist...")
         remove_action = menu.addAction("Remove playlist") if index != -1 else None
         chosen = menu.exec(tab_bar.mapToGlobal(pos))
         if chosen is add_action:
             self.add_playlist()
+        elif chosen is load_action:
+            self.load_playlist_dialog()
         elif chosen is not None and chosen is remove_action:
             self.remove_playlist(index)
 
     def add_playlist(self):
         name, file_name = self.next_default_playlist_name()
-        playlist = Playlist(name=name, file_name=file_name, tracks=[])
+        self.open_playlist(Playlist(name=name, file_name=file_name, tracks=[]))
+
+    def open_playlist(self, playlist: Playlist):
         self.playlists.append(playlist)
         table = self.create_table()
         self.tabs.addTab(table, playlist.name)
         self.populate_table(table, playlist)
         self.tabs.setCurrentWidget(table)
         self.save_state()
+
+    def load_playlist_dialog(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Load Playlist", str(self.data_dir), PLAYLIST_FILE_FILTER
+        )
+        if not path:
+            return
+        chosen = Path(path)
+        for index, playlist in enumerate(self.playlists):
+            if self.playlist_path(playlist) == chosen:
+                self.tabs.setCurrentIndex(index)
+                return
+        name, tracks = self.read_m3u(chosen)
+        self.open_playlist(
+            Playlist(name=name or chosen.stem, file_name=str(chosen), tracks=tracks)
+        )
 
     def remove_playlist(self, index: int):
         if not 0 <= index < len(self.playlists):
@@ -245,7 +307,8 @@ class MainWindow(QMainWindow):
         answer = QMessageBox.question(
             self,
             "Remove playlist",
-            f"Remove playlist '{playlist.name}'?\nThis also deletes {playlist.file_name}.",
+            f"Remove playlist '{playlist.name}' from the list?\n"
+            f"{self.playlist_path(playlist)} is kept on disk and can be loaded again.",
             QMessageBox.Yes | QMessageBox.No,
             QMessageBox.No,
         )
@@ -255,9 +318,6 @@ class MainWindow(QMainWindow):
         self.tabs.removeTab(index)
         widget.deleteLater()
         del self.playlists[index]
-        m3u_path = self.data_dir / playlist.file_name
-        if m3u_path.exists():
-            m3u_path.unlink()
         self.current_track_index = -1
         if self.playlists:
             self.save_state()
@@ -272,14 +332,14 @@ class MainWindow(QMainWindow):
         self.save_state()
 
     def next_default_playlist_name(self):
-        used = {p.file_name.lower() for p in self.playlists}
-        if "default.m3u" not in used:
+        used = {p.name.casefold() for p in self.playlists}
+        if "default" not in used:
             return "default", "default.m3u"
-        i = 1
+        i = 2
         while True:
-            candidate = f"default{i}.m3u"
-            if candidate.lower() not in used:
-                return f"default{i}", candidate
+            candidate = f"default{i}"
+            if candidate not in used:
+                return candidate, self.unique_file_name(f"{candidate}.m3u", -1)
             i += 1
 
     def load_custom_tags(self):
@@ -293,22 +353,28 @@ class MainWindow(QMainWindow):
     def save_custom_tags(self):
         self.custom_tags_file.write_text(",".join(self.custom_tags), encoding="utf-8")
 
-    def load_m3u_tracks(self, file_name: str) -> List[str]:
-        m3u_path = self.data_dir / file_name
+    def playlist_path(self, playlist: Playlist) -> Path:
+        """Loaded playlists keep their own location; the app's own ones live in the data dir."""
+        path = Path(playlist.file_name)
+        return path if path.is_absolute() else self.data_dir / path
+
+    def read_m3u(self, path: Path):
+        name = ""
         tracks = []
-        if not m3u_path.exists():
-            return tracks
-        for line in m3u_path.read_text(encoding="utf-8").splitlines():
-            path = line.strip()
-            if not path or path.startswith("#"):
-                continue
-            tracks.append(path)
-        return tracks
+        if not path.exists():
+            return name, tracks
+        for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+            line = line.strip()
+            if line.startswith("#PLAYLIST:"):
+                name = line[len("#PLAYLIST:"):].strip()
+            elif line and not line.startswith("#"):
+                tracks.append(line)
+        return name, tracks
 
     def save_playlist_file(self, playlist: Playlist):
-        m3u_path = self.data_dir / playlist.file_name
-        lines = ["#EXTM3U"] + playlist.tracks
-        m3u_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        # The file name is ASCII, so the display name is kept in the standard #PLAYLIST header.
+        lines = ["#EXTM3U", f"#PLAYLIST:{playlist.name}"] + playlist.tracks
+        self.playlist_path(playlist).write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     def load_state(self):
         self.load_custom_tags()
@@ -316,9 +382,11 @@ class MainWindow(QMainWindow):
         if self.playlists_file.exists():
             state = json.loads(self.playlists_file.read_text(encoding="utf-8"))
             self.playlists = [
-                Playlist(name=p["name"], file_name=p["file_name"], tracks=self.load_m3u_tracks(p["file_name"]))
+                Playlist(name=p["name"], file_name=p["file_name"])
                 for p in state.get("playlists", [])
             ]
+            for playlist in self.playlists:
+                playlist.tracks = self.read_m3u(self.playlist_path(playlist))[1]
             active_index = int(state.get("active_index", 0))
         else:
             self.playlists = []
@@ -698,42 +766,23 @@ class MainWindow(QMainWindow):
     def on_duration_changed(self, duration: int):
         self.progress.setRange(0, max(0, duration))
 
-    def rename_playlist(self):
-        idx = self.tabs.currentIndex()
-        if idx < 0:
+    def save_playlist_as(self):
+        index = self.tabs.currentIndex()
+        if index < 0:
             return
-        playlist = self.playlists[idx]
-        old_file_name = playlist.file_name
-        new_name, ok = QInputDialog.getText(self, "Rename playlist", "Playlist name:", text=playlist.name)
-        if not ok:
+        playlist = self.playlists[index]
+        suggested = self.playlist_path(playlist).with_name(f"{slugify(playlist.name)}.m3u")
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Save Playlist As", str(suggested), PLAYLIST_FILE_FILTER
+        )
+        if not path:
             return
-        new_name = new_name.strip()
-        if not new_name:
-            return
-
-        new_file, ok2 = QInputDialog.getText(self, "Save as", "Playlist filename (.m3u):", text=playlist.file_name)
-        if not ok2:
-            return
-        new_file = new_file.strip()
-        if not new_file:
-            return
-        if not new_file.lower().endswith(".m3u"):
-            new_file += ".m3u"
-        if Path(new_file).name != new_file:
-            QMessageBox.warning(self, "Invalid filename", "Playlist filename must not include directories.")
-            return
-        if any(i != idx and p.file_name.lower() == new_file.lower() for i, p in enumerate(self.playlists)):
-            QMessageBox.warning(self, "Filename in use", "Another playlist is already using that .m3u filename.")
-            return
-
-        playlist.name = new_name
-        playlist.file_name = new_file
-        self.tabs.setTabText(idx, new_name)
+        target = Path(path)
+        if target.suffix.lower() not in (".m3u", ".m3u8"):
+            target = target.with_suffix(".m3u")
+        # The previous file is left alone; the playlist simply continues in its new location.
+        playlist.file_name = str(target)
         self.save_state()
-        if old_file_name.lower() != new_file.lower():
-            old_path = self.data_dir / old_file_name
-            if old_path.exists():
-                old_path.unlink()
 
     def closeEvent(self, event):
         self.save_custom_tags()

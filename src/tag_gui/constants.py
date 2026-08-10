@@ -1,5 +1,6 @@
 AUDIO_EXTENSIONS = {".mp3", ".flac", ".fla", ".wma", ".aac"}
 AUDIO_FILE_FILTER = "Audio files (*.mp3 *.flac *.fla *.wma *.aac)"
+PLAYLIST_FILE_FILTER = "Playlists (*.m3u *.m3u8)"
 APP_TITLE = "Tag GUI"
 PLAY_GLYPH = "\u25b6"
 PAUSE_GLYPH = "\u23f8"

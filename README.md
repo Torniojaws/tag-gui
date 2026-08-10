@@ -68,7 +68,9 @@ workflow run as artifacts.
 - Sortable/resizable columns with horizontal scrolling; a header click sorts descending first (checked tags on top) and scrolls back to the top
 - Splash screen with a progress bar while playlists load at startup
 - Tags read from files are cached in `metadata.json` under app data and reused until a file's timestamp changes, so restarts do not re-read every file
-- Tabbed M3U playlists persisted between sessions (`default.m3u`, `default1.m3u`, ...)
-- Add Playlist button, or right-click the tab bar for Add / Remove playlist (removal asks first and deletes the `.m3u`)
-- Double-click empty tab bar space to create the next default playlist
+- Tabbed M3U playlists persisted between sessions (`default.m3u`, `default2.m3u`, ...)
+- Double-click empty tab bar space to add the next `defaultN` playlist
+- Double-click a tab to rename the playlist in place; the `.m3u` is renamed to an ASCII slug (`Äidille musaa` -> `aidille-musaa.m3u`) and the display name is stored in the file's `#PLAYLIST` header
+- Close a playlist with its tab `X`, middle-click, or right-click -> Remove playlist; it asks first and never deletes the `.m3u`
+- Load Playlist opens any existing `.m3u` as a new rightmost tab and keeps updating it in place; Save As points the playlist at a new file
 - Rename/Save As for playlist name and `.m3u` filename
