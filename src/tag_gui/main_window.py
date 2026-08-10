@@ -25,20 +25,43 @@ from PySide6.QtWidgets import (
 )
 
 from .constants import (
+    ACTIONS_WIDTH_SHARE,
     APP_TITLE,
     AUDIO_FILE_FILTER,
     DEFAULT_COLUMNS,
+    NEXT_BUTTON_GLYPH,
+    PAUSE_BUTTON_GLYPH,
+    PAUSE_BUTTON_STYLE,
     PAUSE_GLYPH,
+    PLAY_BUTTON_GLYPH,
+    PLAY_BUTTON_STYLE,
     PLAY_GLYPH,
     POPULATE_BATCH,
+    PREV_BUTTON_GLYPH,
     PROGRESS_THRESHOLD,
     SELECTION_STYLE,
+    STOP_BUTTON_GLYPH,
+    STOP_BUTTON_STYLE,
+    TRANSPORT_BUTTON_RANGE,
+    TRANSPORT_BUTTON_SCALE,
 )
 from .models import Playlist
 from .metadata import MetadataCache
 from .tags import parse_custom_tags, set_custom_tag
 from .utils import app_data_dir, collect_audio_files, seconds_to_mmss
 from .widgets import PlaylistTable, SeekSlider, TagCheckItem
+
+
+def screen_size():
+    screen = QApplication.primaryScreen()
+    return screen.availableGeometry() if screen else None
+
+
+def transport_button_size() -> int:
+    geometry = screen_size()
+    height = geometry.height() if geometry else 900
+    smallest, largest = TRANSPORT_BUTTON_RANGE
+    return max(smallest, min(largest, round(height * TRANSPORT_BUTTON_SCALE)))
 
 
 class MainWindow(QMainWindow):
@@ -79,10 +102,10 @@ class MainWindow(QMainWindow):
         apply_tags_button.clicked.connect(self.apply_custom_tags)
 
         controls = QHBoxLayout()
-        self.prev_btn = QPushButton("Previous")
-        self.play_btn = QPushButton("Play")
-        self.stop_btn = QPushButton("Stop")
-        self.next_btn = QPushButton("Next")
+        self.prev_btn = QPushButton(PREV_BUTTON_GLYPH)
+        self.play_btn = QPushButton(PLAY_BUTTON_GLYPH)
+        self.stop_btn = QPushButton(STOP_BUTTON_GLYPH)
+        self.next_btn = QPushButton(NEXT_BUTTON_GLYPH)
         self.add_btn = QPushButton("Add Files")
         self.add_playlist_btn = QPushButton("Add Playlist")
         self.rename_btn = QPushButton("Rename / Save As")
@@ -95,16 +118,36 @@ class MainWindow(QMainWindow):
         self.add_playlist_btn.clicked.connect(self.add_playlist)
         self.rename_btn.clicked.connect(self.rename_playlist)
 
-        for btn in [
-            self.prev_btn,
-            self.play_btn,
-            self.stop_btn,
-            self.next_btn,
-            self.add_btn,
-            self.add_playlist_btn,
-            self.rename_btn,
-        ]:
-            controls.addWidget(btn)
+        transport = QHBoxLayout()
+        transport.setSpacing(8)
+        button_size = transport_button_size()
+        for btn, tip in (
+            (self.prev_btn, "Previous"),
+            (self.play_btn, "Play"),
+            (self.stop_btn, "Stop"),
+            (self.next_btn, "Next"),
+        ):
+            btn.setToolTip(tip)
+            btn.setFixedSize(button_size, button_size)
+            glyph_font = btn.font()
+            glyph_font.setPixelSize(round(button_size * 0.4))
+            btn.setFont(glyph_font)
+            transport.addWidget(btn)
+        self.play_btn.setStyleSheet(PLAY_BUTTON_STYLE)
+        self.stop_btn.setStyleSheet(STOP_BUTTON_STYLE)
+
+        actions = QWidget()
+        actions_layout = QHBoxLayout(actions)
+        actions_layout.setContentsMargins(0, 0, 0, 0)
+        for btn in (self.add_btn, self.add_playlist_btn, self.rename_btn):
+            actions_layout.addWidget(btn)
+        geometry = screen_size()
+        if geometry:
+            actions.setMaximumWidth(round(geometry.width() * ACTIONS_WIDTH_SHARE))
+
+        controls.addLayout(transport)
+        controls.addStretch(1)
+        controls.addWidget(actions)
 
         self.progress = SeekSlider(Qt.Horizontal)
         self.progress.setRange(0, 0)
@@ -490,7 +533,10 @@ class MainWindow(QMainWindow):
         return f"{artist} - {song}" if artist else song
 
     def on_playback_state_changed(self, state):
-        self.play_btn.setText("Pause" if state == QMediaPlayer.PlayingState else "Play")
+        playing = state == QMediaPlayer.PlayingState
+        self.play_btn.setText(PAUSE_BUTTON_GLYPH if playing else PLAY_BUTTON_GLYPH)
+        self.play_btn.setToolTip("Pause" if playing else "Play")
+        self.play_btn.setStyleSheet(PAUSE_BUTTON_STYLE if playing else PLAY_BUTTON_STYLE)
         source = self.player.source().toLocalFile()
         if not source:
             self.setWindowTitle(APP_TITLE)
