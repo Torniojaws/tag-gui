@@ -1,4 +1,7 @@
 # tag-gui
+
+[![Tests and build](https://github.com/Torniojaws/tag-gui/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/Torniojaws/tag-gui/actions/workflows/build.yml)
+
 Tag GUI for audio files
 
 ## Run
@@ -79,9 +82,10 @@ installation. PyInstaller is not a cross-compiler, so build on the platform you 
 
 ## Automated builds
 
-Every push to `main` runs [.github/workflows/build.yml](.github/workflows/build.yml), which builds
-the executable on Windows and Linux and publishes both as a release tagged with the build time,
-e.g. `v202608101505` containing `tag-gui-202608101505.exe` and `tag-gui-202608101505-linux`.
+Every push to `main` runs [.github/workflows/build.yml](.github/workflows/build.yml), which runs
+the test suite on Windows and Linux, then builds the executable on both and publishes them as a
+release tagged with the build time, e.g. `v202608101505` containing `tag-gui-202608101505.exe` and
+`tag-gui-202608101505-linux`. A failing test stops the build, so no release is published.
 Releases are linked from the repository front page; the same files are also attached to the
 workflow run as artifacts.
 
