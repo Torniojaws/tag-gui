@@ -1,10 +1,69 @@
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QEvent, QRect, Qt
 from PySide6.QtGui import QBrush, QColor
-from PySide6.QtWidgets import QAbstractItemView, QSlider, QTableWidget, QTableWidgetItem
+from PySide6.QtWidgets import (
+    QAbstractItemView,
+    QApplication,
+    QSlider,
+    QStyle,
+    QStyledItemDelegate,
+    QStyleOptionButton,
+    QStyleOptionViewItem,
+    QTableWidget,
+    QTableWidgetItem,
+)
 
 from .constants import ALBUM_COLUMN, ALBUM_TINT_DARK, ALBUM_TINT_LIGHT, AUDIO_EXTENSIONS
+
+
+def is_checked(index) -> bool:
+    # CheckStateRole comes back as a plain int, which never compares equal to Qt.Checked.
+    state = index.data(Qt.CheckStateRole)
+    return state is not None and Qt.CheckState(state) == Qt.Checked
+
+
+class CenteredCheckDelegate(QStyledItemDelegate):
+    """Qt always lays the check indicator out on the left, so draw it centered instead."""
+
+    def indicator_rect(self, option, widget) -> QRect:
+        style = widget.style() if widget else QApplication.style()
+        rect = QRect(
+            0,
+            0,
+            style.pixelMetric(QStyle.PM_IndicatorWidth, option, widget),
+            style.pixelMetric(QStyle.PM_IndicatorHeight, option, widget),
+        )
+        rect.moveCenter(option.rect.center())
+        return rect
+
+    def paint(self, painter, option, index):
+        if not index.flags() & Qt.ItemIsUserCheckable:
+            super().paint(painter, option, index)
+            return
+
+        view_option = QStyleOptionViewItem(option)
+        self.initStyleOption(view_option, index)
+        view_option.text = ""
+        view_option.features &= ~QStyleOptionViewItem.HasCheckIndicator
+        widget = view_option.widget
+        style = widget.style() if widget else QApplication.style()
+        style.drawControl(QStyle.CE_ItemViewItem, view_option, painter, widget)
+
+        button = QStyleOptionButton()
+        button.rect = self.indicator_rect(option, widget)
+        button.state = QStyle.State_Enabled
+        button.state |= QStyle.State_On if is_checked(index) else QStyle.State_Off
+        style.drawPrimitive(QStyle.PE_IndicatorCheckBox, button, painter, widget)
+
+    def editorEvent(self, event, model, option, index):
+        if not index.flags() & Qt.ItemIsUserCheckable:
+            return super().editorEvent(event, model, option, index)
+        if event.type() == QEvent.MouseButtonRelease and event.button() == Qt.LeftButton:
+            if self.indicator_rect(option, option.widget).contains(event.position().toPoint()):
+                new_state = Qt.Unchecked if is_checked(index) else Qt.Checked
+                return model.setData(index, new_state, Qt.CheckStateRole)
+        return False
 
 
 class SeekSlider(QSlider):

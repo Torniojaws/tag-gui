@@ -28,8 +28,11 @@ from PySide6.QtWidgets import (
 from .constants import (
     ACTIONS_WIDTH_SHARE,
     APP_TITLE,
+    ARTIST_COLUMN,
     AUDIO_FILE_FILTER,
     DEFAULT_COLUMNS,
+    DURATION_COLUMN,
+    DURATION_COLUMN_PADDING,
     NEXT_BUTTON_GLYPH,
     PAUSE_BUTTON_GLYPH,
     PAUSE_BUTTON_STYLE,
@@ -41,17 +44,19 @@ from .constants import (
     PREV_BUTTON_GLYPH,
     PROGRESS_THRESHOLD,
     SELECTION_STYLE,
+    SONG_COLUMN,
     STOP_BUTTON_GLYPH,
     STOP_BUTTON_STYLE,
     TRANSPORT_BUTTON_RANGE,
     TRANSPORT_BUTTON_SCALE,
+    YEAR_COLUMN,
 )
 from .models import Playlist
 from .metadata import MetadataCache
 from .dialogs import StandardTagsDialog
 from .tags import parse_custom_tags, set_custom_tag, set_standard_tags
 from .utils import app_data_dir, collect_audio_files, seconds_to_mmss
-from .widgets import PlaylistTable, SeekSlider, TagCheckItem
+from .widgets import CenteredCheckDelegate, PlaylistTable, SeekSlider, TagCheckItem
 
 
 def screen_size():
@@ -192,6 +197,7 @@ class MainWindow(QMainWindow):
         # Sizing columns against every row is too slow for large playlists.
         table.horizontalHeader().setResizeContentsPrecision(50)
         table.verticalHeader().setVisible(False)
+        table.setItemDelegate(CenteredCheckDelegate(table))
         table.setContextMenuPolicy(Qt.CustomContextMenu)
         table.customContextMenuRequested.connect(self.on_table_context_menu)
         table.itemDoubleClicked.connect(self.on_item_double_clicked)
@@ -359,6 +365,10 @@ class MainWindow(QMainWindow):
                     item = QTableWidgetItem(value)
                     # Standard tags are edited through the right-click dialog, never inline.
                     item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
+                    if col == YEAR_COLUMN:
+                        item.setTextAlignment(Qt.AlignCenter)
+                    elif col == DURATION_COLUMN:
+                        item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
                     if col == 0:
                         item.setData(Qt.UserRole, track)
                     table.setItem(row, col, item)
@@ -367,6 +377,7 @@ class MainWindow(QMainWindow):
                     col = len(DEFAULT_COLUMNS) + offset
                     item = TagCheckItem()
                     item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable | Qt.ItemIsUserCheckable)
+                    item.setTextAlignment(Qt.AlignCenter)
                     item.setCheckState(Qt.Checked if info.tag_states.get(tag) else Qt.Unchecked)
                     item.setData(Qt.UserRole, track)
                     item.setData(Qt.UserRole + 1, tag)
@@ -374,6 +385,8 @@ class MainWindow(QMainWindow):
             table.reapply_sort()
             table.apply_album_colors()
             table.resizeColumnsToContents()
+            width = table.fontMetrics().horizontalAdvance("00:00") + DURATION_COLUMN_PADDING
+            table.setColumnWidth(DURATION_COLUMN, width)
         finally:
             finish()
             self._updating_table = False
@@ -580,7 +593,7 @@ class MainWindow(QMainWindow):
 
     def playing_title(self, file_path: str) -> str:
         info = self.metadata.get(file_path, self.custom_tags)
-        artist, song = info.fields[0], info.fields[1]
+        artist, song = info.fields[ARTIST_COLUMN], info.fields[SONG_COLUMN]
         if song == Path(file_path).stem:
             # track_fields falls back to the stem, so the file carries no title tag.
             song = Path(file_path).name

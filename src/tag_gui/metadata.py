@@ -5,17 +5,19 @@ from typing import Dict, Iterable, List, Optional, Sequence
 
 from .tags import get_duration, get_field, load_easy_tags, read_custom_tag_states
 
-CACHE_VERSION = 1
+# Bumped whenever the field order changes, so stale entries are discarded.
+CACHE_VERSION = 2
 
 
 def track_fields(path: Path) -> List[str]:
+    """Values in DEFAULT_COLUMNS order."""
     easy = load_easy_tags(path)
     artist = get_field(easy, "artist") if easy else ""
     title = get_field(easy, "title") if easy else ""
     album = get_field(easy, "album") if easy else ""
     date = get_field(easy, "date") if easy else ""
     year = date[:4] if date else ""
-    return [artist, title or path.stem, album, year, get_duration(path)]
+    return [artist, get_duration(path), title or path.stem, year, album]
 
 
 def file_mtime(path: Path) -> float:

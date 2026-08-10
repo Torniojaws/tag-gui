@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from .constants import STANDARD_TAG_FIELDS
+from .constants import DEFAULT_COLUMNS, STANDARD_TAG_FIELDS
 
 MULTIPLE_VALUES = "(multiple values)"
 
@@ -26,7 +26,8 @@ class StandardTagsDialog(QDialog):
         self._initial: Dict[str, str] = {}
 
         form = QFormLayout()
-        for index, (label, key) in enumerate(STANDARD_TAG_FIELDS):
+        for label, key in STANDARD_TAG_FIELDS:
+            index = DEFAULT_COLUMNS.index(label)
             values = {fields[index].strip() for fields in track_fields}
             common = next(iter(values)) if len(values) == 1 else ""
             edit = QLineEdit(common)

@@ -28,10 +28,16 @@ QPushButton:pressed { background-color: #75403c; }
 TRANSPORT_BUTTON_SCALE = 0.05
 TRANSPORT_BUTTON_RANGE = (36, 72)
 ACTIONS_WIDTH_SHARE = 0.25
-DEFAULT_COLUMNS = ["Artist", "Song", "Album", "Year", "Duration"]
+DEFAULT_COLUMNS = ["Artist", "Duration", "Song", "Year", "Album"]
 # Editable standard columns, paired with their mutagen easy-tag key. Duration is derived.
-STANDARD_TAG_FIELDS = (("Artist", "artist"), ("Song", "title"), ("Album", "album"), ("Year", "date"))
+STANDARD_TAG_FIELDS = (("Artist", "artist"), ("Song", "title"), ("Year", "date"), ("Album", "album"))
+ARTIST_COLUMN = DEFAULT_COLUMNS.index("Artist")
+SONG_COLUMN = DEFAULT_COLUMNS.index("Song")
 ALBUM_COLUMN = DEFAULT_COLUMNS.index("Album")
+YEAR_COLUMN = DEFAULT_COLUMNS.index("Year")
+DURATION_COLUMN = DEFAULT_COLUMNS.index("Duration")
+# Duration only ever shows mm:ss, so it does not need content-based sizing.
+DURATION_COLUMN_PADDING = 24
 # Second shade for alternating album runs, picked per theme lightness.
 ALBUM_TINT_LIGHT = (232, 238, 247)
 ALBUM_TINT_DARK = (38, 44, 56)
