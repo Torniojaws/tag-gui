@@ -81,7 +81,6 @@ class MainWindow(QMainWindow):
         controls = QHBoxLayout()
         self.prev_btn = QPushButton("Previous")
         self.play_btn = QPushButton("Play")
-        self.pause_btn = QPushButton("Pause")
         self.stop_btn = QPushButton("Stop")
         self.next_btn = QPushButton("Next")
         self.add_btn = QPushButton("Add Files")
@@ -89,8 +88,7 @@ class MainWindow(QMainWindow):
         self.rename_btn = QPushButton("Rename / Save As")
 
         self.prev_btn.clicked.connect(self.play_previous)
-        self.play_btn.clicked.connect(self.play_current_or_selected)
-        self.pause_btn.clicked.connect(self.player.pause)
+        self.play_btn.clicked.connect(self.toggle_play_pause)
         self.stop_btn.clicked.connect(self.player.stop)
         self.next_btn.clicked.connect(self.play_next)
         self.add_btn.clicked.connect(self.add_files_dialog)
@@ -100,7 +98,6 @@ class MainWindow(QMainWindow):
         for btn in [
             self.prev_btn,
             self.play_btn,
-            self.pause_btn,
             self.stop_btn,
             self.next_btn,
             self.add_btn,
@@ -493,6 +490,7 @@ class MainWindow(QMainWindow):
         return f"{artist} - {song}" if artist else song
 
     def on_playback_state_changed(self, state):
+        self.play_btn.setText("Pause" if state == QMediaPlayer.PlayingState else "Play")
         source = self.player.source().toLocalFile()
         if not source:
             self.setWindowTitle(APP_TITLE)
@@ -504,15 +502,20 @@ class MainWindow(QMainWindow):
         else:
             self.setWindowTitle(APP_TITLE)
 
-    def play_current_or_selected(self):
+    def toggle_play_pause(self):
+        state = self.player.playbackState()
+        if state == QMediaPlayer.PlayingState:
+            self.player.pause()
+            return
         table = self.current_table()
         selected = table.currentRow()
+        if state == QMediaPlayer.PausedState:
+            paused_row = self.row_for_path(table, self.player.source().toLocalFile())
+            if selected < 0 or selected == paused_row:
+                self.player.play()
+                return
         if selected >= 0:
             self.play_row(selected)
-        elif self.current_track_index >= 0:
-            self.play_row(self.current_track_index)
-        elif self.current_playlist().tracks:
-            self.play_row(0)
 
     def play_next(self):
         table = self.current_table()
