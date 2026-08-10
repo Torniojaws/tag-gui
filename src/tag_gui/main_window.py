@@ -153,9 +153,15 @@ class MainWindow(QMainWindow):
         if geometry:
             actions.setMaximumWidth(round(geometry.width() * ACTIONS_WIDTH_SHARE))
 
-        controls.addLayout(transport)
+        # Equal stretch on both sides keeps the transport centered in the window, not just
+        # in the space left over by the action buttons.
+        right_side = QHBoxLayout()
+        right_side.addStretch(1)
+        right_side.addWidget(actions)
+
         controls.addStretch(1)
-        controls.addWidget(actions)
+        controls.addLayout(transport)
+        controls.addLayout(right_side, 1)
 
         self.progress = SeekSlider(Qt.Horizontal)
         self.progress.setRange(0, 0)
