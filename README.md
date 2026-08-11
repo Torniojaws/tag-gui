@@ -13,8 +13,7 @@ This is almost entirely AI-generated, so no warranties :D
 
 [![Tests and build](https://github.com/Torniojaws/tag-gui/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/Torniojaws/tag-gui/actions/workflows/build.yml)
 
-<img width="1919" height="1043" alt="image" src="https://github.com/user-attachments/assets/381c1a9c-0c7e-415a-8363-1b3442700449" />
-
+<img width="3838" height="2086" alt="image" src="https://github.com/user-attachments/assets/8e4822cd-6ac2-490b-99f2-8711dbbf730d" />
 
 ## Run
 
