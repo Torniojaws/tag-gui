@@ -6,6 +6,7 @@ from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
     QHeaderView,
+    QMessageBox,
     QStyle,
     QStyledItemDelegate,
     QStyleOptionButton,
@@ -163,12 +164,22 @@ class PlaylistTable(QTableWidget):
 
     def dropEvent(self, event):
         paths = []
+        has_wav = False
         for url in event.mimeData().urls():
             if not url.isLocalFile():
                 continue
             local = Path(url.toLocalFile())
+            if local.suffix.lower() == ".wav":
+                has_wav = True
+                continue
             if local.is_dir() or local.suffix.lower() in AUDIO_EXTENSIONS:
                 paths.append(str(local))
+        if has_wav:
+            QMessageBox.warning(
+                self,
+                "Unsupported format",
+                "WAV files do not support tags and metadata and cannot be added.",
+            )
         if paths:
             self.on_files_dropped(paths)
             event.acceptProposedAction()

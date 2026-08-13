@@ -5,6 +5,7 @@ APP_TITLE = "Tag GUI"
 
 AUDIO_EXTENSIONS = {".mp3", ".flac", ".fla", ".wma", ".aac"}
 AUDIO_FILE_FILTER = "Audio files (*.mp3 *.flac *.fla *.wma *.aac)"
+AUDIO_FILE_FILTER_WITH_WAV = "Audio files (*.mp3 *.flac *.fla *.wma *.aac *.wav)"
 PLAYLIST_FILE_FILTER = "Playlists (*.m3u *.m3u8)"
 
 ICON_SIZES = (16, 24, 32, 48, 64, 128, 256)
