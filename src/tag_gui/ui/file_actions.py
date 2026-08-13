@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..constants import AUDIO_FILE_FILTER, POPULATE_BATCH
+from ..constants import AUDIO_FILE_FILTER, AUDIO_FILE_FILTER_WITH_WAV, POPULATE_BATCH
 from ..core.scanning import collect_audio_files
 from .sizing import screen_geometry
 from .styles import ACTIONS_WIDTH_SHARE
@@ -42,9 +42,19 @@ class FileActionsMixin(WindowContext):
         return actions
 
     def add_files_dialog(self):
-        paths, _ = QFileDialog.getOpenFileNames(self, "Add Files", "", AUDIO_FILE_FILTER)
-        if paths:
-            self.add_tracks_to_current_playlist([str(Path(p)) for p in paths])
+        paths, _ = QFileDialog.getOpenFileNames(self, "Add Files", "", AUDIO_FILE_FILTER_WITH_WAV)
+        if not paths:
+            return
+        wav_paths = [p for p in paths if Path(p).suffix.lower() == ".wav"]
+        if wav_paths:
+            QMessageBox.warning(
+                self,
+                "Unsupported format",
+                "WAV files do not support tags and metadata and cannot be added.",
+            )
+        audio_paths = [p for p in paths if Path(p).suffix.lower() != ".wav"]
+        if audio_paths:
+            self.add_tracks_to_current_playlist([str(Path(p)) for p in audio_paths])
 
     def add_tracks_to_current_playlist(self, paths: List[str]):
         tracks = self.scan_for_audio_files(paths)
