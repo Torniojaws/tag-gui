@@ -3,7 +3,7 @@
 from pathlib import Path
 
 from PySide6.QtCore import QUrl, Qt
-from PySide6.QtMultimedia import QAudio, QAudioOutput, QMediaPlayer
+from PySide6.QtMultimedia import QAudio, QAudioOutput, QMediaDevices, QMediaPlayer
 
 from ..constants import APP_TITLE, ARTIST_COLUMN, PATH_COLUMN, SONG_COLUMN
 from ..core.utils import seconds_to_mmss
@@ -18,7 +18,7 @@ from .window_base import WindowContext
 class PlaybackMixin(WindowContext):
     def _build_player(self):
         self.player = QMediaPlayer()
-        self.audio_output = QAudioOutput()
+        self.audio_output = QAudioOutput(QMediaDevices.defaultAudioOutput())
         self.player.setAudioOutput(self.audio_output)
         self.player.positionChanged.connect(self.on_position_changed)
         self.player.durationChanged.connect(self.on_duration_changed)
