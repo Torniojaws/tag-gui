@@ -15,6 +15,16 @@ This is almost entirely AI-generated, so no warranties :D
 
 <img width="3838" height="2086" alt="image" src="https://github.com/user-attachments/assets/8e4822cd-6ac2-490b-99f2-8711dbbf730d" />
 
+## Downloads
+
+1. Open https://github.com/Torniojaws/tag-gui/releases
+2. Windows:
+    1. Download the file `tag-gui-<datetime>.exe` and run it
+3. For Debian-like (Linux Mint, Ubuntu, etc):
+    1. Download the file `tag-gui-<datetime>-linux`
+    2. Give it execute permissions with: `chmod +x tag-gui-<datetime>-linux`
+    3. And then run it with `./tag-gui-<datetime>-linux`
+
 ## Run
 
 ```bash
