@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from PySide6.QtCore import QEvent, QRect, Qt
-from PySide6.QtGui import QBrush, QColor
+from PySide6.QtGui import QBrush, QColor, QKeySequence
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
@@ -79,10 +79,14 @@ class CenteredCheckDelegate(QStyledItemDelegate):
 
 
 class PlaylistTable(QTableWidget):
-    def __init__(self, on_files_dropped, on_delete_pressed, parent=None):
+    def __init__(
+        self, on_files_dropped, on_delete_pressed, on_copy_pressed, on_paste_pressed, parent=None
+    ):
         super().__init__(parent)
         self.on_files_dropped = on_files_dropped
         self.on_delete_pressed = on_delete_pressed
+        self.on_copy_pressed = on_copy_pressed
+        self.on_paste_pressed = on_paste_pressed
         self.setAcceptDrops(True)
         self.setDragDropMode(QAbstractItemView.DropOnly)
         self.setHorizontalScrollMode(QAbstractItemView.ScrollPerPixel)
@@ -147,6 +151,12 @@ class PlaylistTable(QTableWidget):
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Delete and not event.modifiers():
             self.on_delete_pressed()
+            return
+        if event.matches(QKeySequence.Copy):
+            self.on_copy_pressed()
+            return
+        if event.matches(QKeySequence.Paste):
+            self.on_paste_pressed()
             return
         super().keyPressEvent(event)
 

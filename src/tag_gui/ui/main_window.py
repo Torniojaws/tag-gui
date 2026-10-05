@@ -85,7 +85,12 @@ class MainWindow(PlaylistActionsMixin, FileActionsMixin, TagActionsMixin, Playba
         return self.tabs.currentWidget()
 
     def create_table(self) -> PlaylistTable:
-        table = PlaylistTable(self.add_tracks_to_current_playlist, self.remove_selected_tracks)
+        table = PlaylistTable(
+            self.add_tracks_to_current_playlist,
+            self.remove_selected_tracks,
+            self.copy_selected_tracks,
+            self.paste_tracks,
+        )
         table.customContextMenuRequested.connect(self.on_table_context_menu)
         table.itemDoubleClicked.connect(self.on_item_double_clicked)
         table.itemChanged.connect(self.on_item_changed)

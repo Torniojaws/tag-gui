@@ -1,6 +1,7 @@
 """One offscreen run of the real window, so a broken mixin or layout fails the suite."""
 
 import pytest
+from PySide6.QtCore import QItemSelectionModel
 
 from tag_gui.constants import DEFAULT_COLUMNS
 from tag_gui.ui import main_window as main_window_module
@@ -39,6 +40,26 @@ def test_adding_a_track_fills_a_row(window, tmp_path, monkeypatch):
     assert table.rowCount() == 1
     assert table.columnCount() == len(DEFAULT_COLUMNS)
     assert window.current_playlist().tracks == [str(song)]
+
+
+def test_copy_paste_moves_selected_tracks_to_another_playlist(window, tmp_path, monkeypatch):
+    songs = [str(write_flac(tmp_path / f"song{i}.flac")) for i in range(3)]
+    monkeypatch.setattr(MainWindow, "scan_for_audio_files", lambda self, paths: list(paths))
+    window.add_tracks_to_current_playlist(songs)
+    source = window.current_table()
+    source.selectRow(0)
+    source.selectionModel().select(
+        source.model().index(2, 0),
+        QItemSelectionModel.Select | QItemSelectionModel.Rows,
+    )
+    window.copy_selected_tracks()
+
+    window.add_playlist()
+    window.paste_tracks()
+    window.paste_tracks()
+
+    assert window.current_playlist().tracks == [songs[0], songs[2]]
+    assert window.current_table().rowCount() == 2
 
 
 def test_applying_custom_tags_adds_a_column(window):

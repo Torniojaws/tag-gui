@@ -19,11 +19,11 @@ This is almost entirely AI-generated, so no warranties :D
 
 1. Open https://github.com/Torniojaws/tag-gui/releases
 2. Windows:
-    1. Download the file `tag-gui-<datetime>.exe` and run it
+   1. Download the file `tag-gui-<datetime>.exe` and run it
 3. For Debian-like (Linux Mint, Ubuntu, etc):
-    1. Download the file `tag-gui-<datetime>-linux`
-    2. Give it execute permissions with: `chmod +x tag-gui-<datetime>-linux`
-    3. And then run it with `./tag-gui-<datetime>-linux`
+   1. Download the file `tag-gui-<datetime>-linux`
+   2. Give it execute permissions with: `chmod +x tag-gui-<datetime>-linux`
+   3. And then run it with `./tag-gui-<datetime>-linux`
 
 ## Run
 
@@ -86,7 +86,6 @@ set `QT_QPA_PLATFORM=offscreen` so they need no display.
 
 [`python build.py`](build.py) runs the build steps in sequence and needs nothing but Python:
 
-
 `.\build` is the [`build.cmd`](build.cmd) wrapper; PowerShell requires the `.\` prefix, `cmd.exe`
 does not. On macOS/Linux run `python build.py <task>` instead.
 
@@ -113,6 +112,7 @@ workflow run as artifacts.
 ## Features
 
 - Drag and drop audio files (`.mp3`, `.flac`, `.fla`, `.wma`, `.aac`) or whole folders into playlist tables, or use the Add Files button
+- Copy and paste one or more selected songs between playlists
 - Dropped folders are scanned recursively with a cancellable progress dialog; tags are then read in batches so large trees stay responsive
 - Select rows (shift/ctrl click, `Ctrl+A`) and press `Delete` to remove them; removing several asks for confirmation
 - Playlist columns: Artist, Duration, Song, Year, Album

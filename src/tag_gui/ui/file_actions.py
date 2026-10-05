@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import List
 
-from PySide6.QtCore import QUrl, Qt
+from PySide6.QtCore import QMimeData, QUrl, Qt
 from PySide6.QtWidgets import (
     QApplication,
     QFileDialog,
@@ -86,6 +86,24 @@ class FileActionsMixin(WindowContext):
             return collect_audio_files(paths, on_progress, progress.wasCanceled)
         finally:
             progress.close()
+
+    def copy_selected_tracks(self):
+        paths = selected_tracks(self.current_table())
+        if not paths:
+            return
+        # File URLs let the tracks be pasted into a file manager too, and vice versa.
+        mime = QMimeData()
+        mime.setUrls([QUrl.fromLocalFile(p) for p in paths])
+        mime.setText("\n".join(paths))
+        QApplication.clipboard().setMimeData(mime)
+
+    def paste_tracks(self):
+        mime = QApplication.clipboard().mimeData()
+        if not mime or not mime.hasUrls():
+            return
+        paths = [str(Path(url.toLocalFile())) for url in mime.urls() if url.isLocalFile()]
+        if paths:
+            self.add_tracks_to_current_playlist(paths)
 
     def remove_selected_tracks(self):
         table = self.current_table()
