@@ -47,13 +47,14 @@ src/tag_gui/
         tags.py            mutagen reads/writes, custom tag normalization
         metadata.py        cached track fields and tag states
         scanning.py        recursive audio file collection
+        settings.py        user settings (skip step, timebar position) in settings.json
         utils.py           app data dir, slugify, mm:ss formatting
     ui/
         styles.py          colours, glyphs, sizes
         sizing.py          screen-derived widget sizes
         icons.py           note and speaker drawing
         splash.py          startup window
-        dialogs.py         standard tag editor
+        dialogs.py         standard tag editor and settings window
         table.py           PlaylistTable, check delegate, album shading
         table_fill.py      filling and refreshing rows
         tabs.py            renameable tab bar
@@ -118,7 +119,8 @@ workflow run as artifacts.
 - Playlist columns: Artist, Duration, Song, Year, Album
 - Standard tags are edited via right-click -> Edit tags, which writes only the fields you changed, across every selected row (Duration is read-only)
 - Double-click row to play, plus Previous/Play/Pause/Stop/Next controls
-- Clickable seek/progress bar
+- Clickable seek/progress bar, shown at the top, bottom or both (Settings...)
+- While a song plays, `Left`/`Right` skip back/forward by a configurable step (1-60 s, default 5); skipping stops at the start of the song, and skipping past the end starts the next song, which a held key does not keep scrubbing
 - Custom checkbox-tag columns via comma-separated textbox (persisted in `custom_tags.txt` under app data)
 - Tag names are displayed as typed but stored as ASCII (`Yömusa` is written to files as `Yomusa`)
 - Custom tag value `X` means checked; unchecking removes the tag from the file, checking writes it back

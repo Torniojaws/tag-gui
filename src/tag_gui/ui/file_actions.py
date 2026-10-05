@@ -27,14 +27,16 @@ class FileActionsMixin(WindowContext):
         add_btn = QPushButton("Add Files")
         load_btn = QPushButton("Load Playlist")
         save_as_btn = QPushButton("Save As...")
+        settings_btn = QPushButton("Settings...")
         add_btn.clicked.connect(self.add_files_dialog)
         load_btn.clicked.connect(self.load_playlist_dialog)
         save_as_btn.clicked.connect(self.save_playlist_as)
+        settings_btn.clicked.connect(self.open_settings)
 
         actions = QWidget()
         layout = QHBoxLayout(actions)
         layout.setContentsMargins(0, 0, 0, 0)
-        for button in (add_btn, load_btn, save_as_btn):
+        for button in (add_btn, load_btn, save_as_btn, settings_btn):
             layout.addWidget(button)
         geometry = screen_geometry()
         if geometry:

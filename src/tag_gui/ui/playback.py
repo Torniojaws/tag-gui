@@ -1,9 +1,17 @@
 """The media player, its transport/volume/seek widgets and the playback commands."""
 
 from pathlib import Path
+from typing import Tuple
 
-from PySide6.QtCore import QUrl, Qt
+from PySide6.QtCore import QEvent, QUrl, Qt
 from PySide6.QtMultimedia import QAudio, QAudioOutput, QMediaDevices, QMediaPlayer
+from PySide6.QtWidgets import (
+    QAbstractSpinBox,
+    QApplication,
+    QLineEdit,
+    QPlainTextEdit,
+    QTextEdit,
+)
 
 from ..constants import APP_TITLE, ARTIST_COLUMN, PATH_COLUMN, SONG_COLUMN
 from ..core.utils import seconds_to_mmss
@@ -13,6 +21,9 @@ from .table_fill import row_for_path, track_of
 from .transport import TransportBar
 from .volume import VolumeControls
 from .window_base import WindowContext
+
+# Left/Right keep moving the text cursor while one of these has focus.
+TEXT_INPUTS = (QLineEdit, QAbstractSpinBox, QTextEdit, QPlainTextEdit)
 
 
 class PlaybackMixin(WindowContext):
@@ -24,6 +35,9 @@ class PlaybackMixin(WindowContext):
         self.player.durationChanged.connect(self.on_duration_changed)
         self.player.mediaStatusChanged.connect(self.on_media_status_changed)
         self.player.playbackStateChanged.connect(self.on_playback_state_changed)
+        self._skip_blocked = False
+        # Application-wide, so the arrows skip before the table or tab bar can claim them.
+        QApplication.instance().installEventFilter(self)
 
     def _build_playback_widgets(self):
         self.transport = TransportBar()
@@ -36,11 +50,56 @@ class PlaybackMixin(WindowContext):
         self.volume.volume_changed.connect(self.on_volume_changed)
         self.volume.mute_changed.connect(self.audio_output.setMuted)
 
-        self.progress = SeekSlider(Qt.Horizontal)
-        self.progress.setRange(0, 0)
-        self.progress.setFixedHeight(PROGRESS_HEIGHT)
-        self.progress.setStyleSheet(PROGRESS_STYLE)
-        self.progress.sliderMoved.connect(self.player.setPosition)
+        self.progress_top = self._build_seek_bar()
+        self.progress_bottom = self._build_seek_bar()
+
+    def _build_seek_bar(self) -> SeekSlider:
+        bar = SeekSlider(Qt.Horizontal)
+        bar.setRange(0, 0)
+        bar.setFixedHeight(PROGRESS_HEIGHT)
+        bar.setStyleSheet(PROGRESS_STYLE)
+        bar.sliderMoved.connect(self.player.setPosition)
+        return bar
+
+    def seek_bars(self) -> Tuple[SeekSlider, SeekSlider]:
+        return self.progress_top, self.progress_bottom
+
+    def eventFilter(self, watched, event):
+        if event.type() == QEvent.KeyPress and self._handle_skip_key(event):
+            return True
+        return super().eventFilter(watched, event)
+
+    def _handle_skip_key(self, event) -> bool:
+        if event.key() == Qt.Key_Left:
+            direction = -1
+        elif event.key() == Qt.Key_Right:
+            direction = 1
+        else:
+            return False
+        if event.modifiers() not in (Qt.NoModifier, Qt.KeypadModifier):
+            return False
+        if not self.isActiveWindow() or isinstance(QApplication.focusWidget(), TEXT_INPUTS):
+            return False
+        # A held key stops at the song boundary; only a fresh press skips on from there.
+        if event.isAutoRepeat() and self._skip_blocked:
+            return True
+        if self.player.playbackState() != QMediaPlayer.PlayingState:
+            return False
+        self._skip_blocked = self.skip(direction)
+        return True
+
+    def skip(self, direction: int) -> bool:
+        """Seek by the configured step; returns True when the start or end of the song is hit."""
+        target = self.player.position() + direction * self.settings.skip_seconds * 1000
+        if target <= 0:
+            self.player.setPosition(0)
+            return True
+        duration = self.player.duration()
+        if 0 < duration <= target:
+            self.play_next()
+            return True
+        self.player.setPosition(target)
+        return False
 
     def on_item_double_clicked(self, item):
         self.play_row(item.row())
@@ -111,15 +170,16 @@ class PlaybackMixin(WindowContext):
             self.play_next()
 
     def on_position_changed(self, position: int):
-        if not self.progress.isSliderDown():
-            self.progress.setValue(position)
         duration = self.player.duration() or 0
-        self.progress.set_text(
-            f"{seconds_to_mmss(position / 1000)} / {seconds_to_mmss(duration / 1000)}"
-        )
+        text = f"{seconds_to_mmss(position / 1000)} / {seconds_to_mmss(duration / 1000)}"
+        for bar in self.seek_bars():
+            if not bar.isSliderDown():
+                bar.setValue(position)
+            bar.set_text(text)
 
     def on_duration_changed(self, duration: int):
-        self.progress.setRange(0, max(0, duration))
+        for bar in self.seek_bars():
+            bar.setRange(0, max(0, duration))
 
     def on_volume_changed(self, value: int):
         # Sliders feel linear to the ear only after a logarithmic conversion.

@@ -13,6 +13,7 @@ from PySide6.QtWidgets import QLineEdit, QMainWindow
 from ..core.metadata import MetadataCache
 from ..core.models import Playlist
 from ..core.playlists import PlaylistStore
+from ..core.settings import Settings
 from .sliders import SeekSlider
 from .table import PlaylistTable
 from .tabs import PlaylistTabs
@@ -23,6 +24,8 @@ from .volume import VolumeControls
 class WindowContext(QMainWindow):
     data_dir: Path
     custom_tags_file: Path
+    settings_file: Path
+    settings: Settings
     custom_tags: List[str]
     store: PlaylistStore
     metadata: MetadataCache
@@ -36,7 +39,8 @@ class WindowContext(QMainWindow):
     tags_input: QLineEdit
     transport: TransportBar
     volume: VolumeControls
-    progress: SeekSlider
+    progress_top: SeekSlider
+    progress_bottom: SeekSlider
 
     @property
     def playlists(self) -> List[Playlist]:
@@ -64,4 +68,10 @@ class WindowContext(QMainWindow):
         raise NotImplementedError
 
     def save_playlist_as(self) -> None:
+        raise NotImplementedError
+
+    def open_settings(self) -> None:
+        raise NotImplementedError
+
+    def play_next(self) -> None:
         raise NotImplementedError

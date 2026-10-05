@@ -3,13 +3,15 @@
 from typing import List
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QHBoxLayout, QMainWindow, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QDialog, QHBoxLayout, QMainWindow, QVBoxLayout, QWidget
 
 from ..constants import APP_TITLE
 from ..core.metadata import MetadataCache
 from ..core.models import Playlist
 from ..core.playlists import PlaylistStore
+from ..core.settings import load_settings, save_settings
 from ..core.utils import app_data_dir
+from .dialogs import SettingsDialog
 from .file_actions import FileActionsMixin
 from .playback import PlaybackMixin
 from .playlist_actions import PlaylistActionsMixin
@@ -26,6 +28,8 @@ class MainWindow(PlaylistActionsMixin, FileActionsMixin, TagActionsMixin, Playba
         self.setWindowTitle(APP_TITLE)
         self.data_dir = app_data_dir()
         self.custom_tags_file = self.data_dir / "custom_tags.txt"
+        self.settings_file = self.data_dir / "settings.json"
+        self.settings = load_settings(self.settings_file)
 
         self.splash = splash
         self.custom_tags: List[str] = []
@@ -39,6 +43,7 @@ class MainWindow(PlaylistActionsMixin, FileActionsMixin, TagActionsMixin, Playba
         self._build_playback_widgets()
         self._build_tabs()
         self._build_layout()
+        self.apply_settings()
         self.load_state()
 
     def _build_layout(self):
@@ -66,11 +71,26 @@ class MainWindow(PlaylistActionsMixin, FileActionsMixin, TagActionsMixin, Playba
         layout = QVBoxLayout(central)
         # Only the seek bar reaches the window edges, so the margins live on the other rows.
         layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self.progress_top)
         layout.addLayout(self._build_tags_row())
         layout.addLayout(tabs_row)
         layout.addLayout(controls_row)
-        layout.addWidget(self.progress)
+        layout.addWidget(self.progress_bottom)
         self.setCentralWidget(central)
+
+    # --------------------------------------------------------------- settings
+
+    def open_settings(self):
+        dialog = SettingsDialog(self.settings, self)
+        if dialog.exec() != QDialog.Accepted:
+            return
+        self.settings = dialog.settings()
+        save_settings(self.settings_file, self.settings)
+        self.apply_settings()
+
+    def apply_settings(self):
+        self.progress_top.setVisible(self.settings.timebar_top)
+        self.progress_bottom.setVisible(self.settings.timebar_bottom)
 
     # ------------------------------------------------------------- accessors
 

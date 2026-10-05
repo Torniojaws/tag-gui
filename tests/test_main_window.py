@@ -1,13 +1,37 @@
 """One offscreen run of the real window, so a broken mixin or layout fails the suite."""
 
 import pytest
-from PySide6.QtCore import QItemSelectionModel
+from PySide6.QtCore import QEvent, QItemSelectionModel, Qt
+from PySide6.QtGui import QKeyEvent
+from PySide6.QtMultimedia import QMediaPlayer
+from PySide6.QtTest import QTest
+from PySide6.QtWidgets import QApplication
 
 from tag_gui.constants import DEFAULT_COLUMNS
+from tag_gui.core.settings import Settings
 from tag_gui.ui import main_window as main_window_module
+from tag_gui.ui.dialogs import SettingsDialog, SkipSecondsInput
 from tag_gui.ui.main_window import MainWindow
 
 from conftest import write_flac
+
+
+class FakePlayer:
+    def __init__(self, position, duration):
+        self._position = position
+        self._duration = duration
+
+    def position(self):
+        return self._position
+
+    def duration(self):
+        return self._duration
+
+    def setPosition(self, position):
+        self._position = position
+
+    def playbackState(self):
+        return QMediaPlayer.PlayingState
 
 
 @pytest.fixture
@@ -26,8 +50,10 @@ def test_a_fresh_window_opens_one_default_playlist(window):
 
 
 def test_every_slice_contributed_its_widgets(window):
-    for name in ("tags_input", "tabs", "transport", "volume", "progress", "player"):
+    for name in ("tags_input", "tabs", "transport", "volume", "player"):
         assert getattr(window, name) is not None
+    assert window.progress_top.isHidden()
+    assert not window.progress_bottom.isHidden()
     assert window.centralWidget() is not None
 
 
@@ -81,3 +107,99 @@ def test_custom_tags_survive_a_restart(window, tmp_path, qapp, monkeypatch):
     finally:
         reopened.close()
         reopened.deleteLater()
+
+
+def arrow(key, repeat=False):
+    return QKeyEvent(QEvent.KeyPress, key, Qt.NoModifier, "", repeat)
+
+
+@pytest.fixture
+def skipping(window, monkeypatch):
+    """The window with a fake player 60 s long, recording every jump to the next song."""
+    nexts = []
+    monkeypatch.setattr(window, "player", FakePlayer(30_000, 60_000))
+    monkeypatch.setattr(window, "play_next", lambda: nexts.append(True))
+    monkeypatch.setattr(window, "isActiveWindow", lambda: True)
+    window.settings = Settings(skip_seconds=5)
+    window.nexts = nexts
+    return window
+
+
+def test_arrows_skip_by_the_configured_step(skipping):
+    assert skipping._handle_skip_key(arrow(Qt.Key_Right))
+    assert skipping.player.position() == 35_000
+    skipping._handle_skip_key(arrow(Qt.Key_Left))
+    skipping._handle_skip_key(arrow(Qt.Key_Left))
+    assert skipping.player.position() == 25_000
+
+
+def test_skipping_back_stops_at_the_start(skipping):
+    skipping.player.setPosition(3_000)
+    skipping._handle_skip_key(arrow(Qt.Key_Left))
+    assert skipping.player.position() == 0
+    skipping.player.setPosition(1_000)
+    skipping._handle_skip_key(arrow(Qt.Key_Left, repeat=True))
+    assert skipping.player.position() == 1_000
+
+
+def test_holding_right_does_not_scrub_into_the_next_song(skipping):
+    skipping.player.setPosition(57_000)
+    skipping._handle_skip_key(arrow(Qt.Key_Right))
+    assert skipping.nexts == [True]
+
+    skipping.player.setPosition(0)
+    assert skipping._handle_skip_key(arrow(Qt.Key_Right, repeat=True))
+    assert skipping.player.position() == 0
+
+    skipping._handle_skip_key(arrow(Qt.Key_Right))
+    assert skipping.player.position() == 5_000
+
+
+def test_arrows_are_left_alone_in_text_fields(skipping):
+    skipping.show()
+    skipping.tags_input.setFocus()
+    QApplication.processEvents()
+    if QApplication.focusWidget() is not skipping.tags_input:
+        pytest.skip("focus is not tracked by this platform plugin")
+    assert not skipping._handle_skip_key(arrow(Qt.Key_Right))
+    assert skipping.player.position() == 30_000
+
+
+def test_skip_seconds_input_keeps_only_digits(qapp):
+    field = SkipSecondsInput(5)
+    field.selectAll()
+    QTest.keyClicks(field, "1asd6")
+    assert (field.text(), field.value()) == ("16", 16)
+    QTest.keyClicks(field, "9")
+    assert field.value() == 16
+
+
+def test_skip_seconds_input_falls_back_to_the_default(qapp):
+    field = SkipSecondsInput(7)
+    field.end(False)
+    QTest.keyClick(field, Qt.Key_Backspace)
+    assert (field.text(), field.value()) == ("5", 5)
+    QTest.keyClicks(field, "9")
+    assert field.value() == 9
+
+    QApplication.clipboard().setText("abc")
+    field.selectAll()
+    field.paste()
+    assert field.value() == 5
+
+
+def test_settings_dialog_never_hides_both_timebars(qapp):
+    dialog = SettingsDialog(Settings(timebar_top=False, timebar_bottom=True))
+    assert not dialog.timebar_bottom.isEnabled()
+    dialog.timebar_top.setChecked(True)
+    assert dialog.timebar_bottom.isEnabled()
+    dialog.timebar_bottom.setChecked(False)
+    assert not dialog.timebar_top.isEnabled()
+    assert dialog.settings() == Settings(timebar_top=True, timebar_bottom=False)
+
+
+def test_timebar_settings_show_the_chosen_bars(window):
+    window.settings = Settings(timebar_top=True, timebar_bottom=True)
+    window.apply_settings()
+    assert not window.progress_top.isHidden()
+    assert not window.progress_bottom.isHidden()
