@@ -1,5 +1,6 @@
 import sys
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication
 
 from .constants import APP_ID
@@ -22,6 +23,9 @@ def main():
 
     app.setWindowIcon(note_icon())
     win = MainWindow(splash=splash)
+    # Tear the window down inside the event loop; left to PySide's exit cleanup, its widget
+    # tree is destroyed after parts of it are already gone and the process segfaults.
+    win.setAttribute(Qt.WA_DeleteOnClose)
     win.resize(1200, 700)
     win.show()
     splash.close()
