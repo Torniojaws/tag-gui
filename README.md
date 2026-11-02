@@ -133,4 +133,5 @@ workflow run as artifacts.
 - Double-click a tab to rename the playlist in place; the `.m3u` is renamed to an ASCII slug (`Äidille musaa` -> `aidille-musaa.m3u`) and the display name is stored in the file's `#PLAYLIST` header
 - Close a playlist with its tab `X`, middle-click, or right-click -> Remove playlist; it asks first and never deletes the `.m3u`
 - Load Playlist opens any existing `.m3u` as a new rightmost tab and keeps updating it in place; Save As points the playlist at a new file
+- Copy files to dir copies every file in the current playlist into a chosen directory with a cancellable progress bar; originals are left untouched, files already there with the same name and size are skipped, and other name clashes get a numbered name (`song (2).flac`) instead of being overwritten
 - Rename/Save As for playlist name and `.m3u` filename

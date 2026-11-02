@@ -54,7 +54,7 @@ ROW_MARGIN = 9
 # Transport buttons are square and sized from the screen height; actions get a share of its width.
 TRANSPORT_BUTTON_SCALE = 0.05
 TRANSPORT_BUTTON_RANGE = (36, 72)
-ACTIONS_WIDTH_SHARE = 0.25
+ACTIONS_WIDTH_SHARE = 0.3
 
 VOLUME_DEFAULT = 75
 VOLUME_SLIDER_WIDTH = 120

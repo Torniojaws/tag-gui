@@ -88,6 +88,28 @@ def test_copy_paste_moves_selected_tracks_to_another_playlist(window, tmp_path, 
     assert window.current_table().rowCount() == 2
 
 
+def test_copy_files_to_dir_copies_the_playlist(window, tmp_path, monkeypatch):
+    from tag_gui.ui import file_actions
+
+    songs = [str(write_flac(tmp_path / f"song{i}.flac")) for i in range(2)]
+    monkeypatch.setattr(MainWindow, "scan_for_audio_files", lambda self, paths: list(paths))
+    window.add_tracks_to_current_playlist(songs)
+    target = tmp_path / "usb"
+    monkeypatch.setattr(
+        file_actions.QFileDialog, "getExistingDirectory", lambda *args: str(target)
+    )
+    messages = []
+    monkeypatch.setattr(
+        file_actions.QMessageBox, "information", lambda *args: messages.append(args[2])
+    )
+
+    window.copy_playlist_to_dir()
+
+    assert sorted(p.name for p in target.iterdir()) == ["song0.flac", "song1.flac"]
+    assert all(tmp_path.joinpath(f"song{i}.flac").exists() for i in range(2))
+    assert messages and messages[0].startswith("Copied 2 of 2 files")
+
+
 def test_applying_custom_tags_adds_a_column(window):
     window.tags_input.setText("Yömusa, rock")
     window.apply_custom_tags()

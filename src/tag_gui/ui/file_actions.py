@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..constants import AUDIO_FILE_FILTER, AUDIO_FILE_FILTER_WITH_WAV, POPULATE_BATCH
+from ..core.copying import copy_files, total_bytes
 from ..core.scanning import collect_audio_files
 from .sizing import screen_geometry
 from .styles import ACTIONS_WIDTH_SHARE
@@ -27,16 +28,18 @@ class FileActionsMixin(WindowContext):
         add_btn = QPushButton("Add Files")
         load_btn = QPushButton("Load Playlist")
         save_as_btn = QPushButton("Save As...")
+        copy_to_dir_btn = QPushButton("Copy files to dir")
         settings_btn = QPushButton("Settings...")
         add_btn.clicked.connect(self.add_files_dialog)
         load_btn.clicked.connect(self.load_playlist_dialog)
         save_as_btn.clicked.connect(self.save_playlist_as)
+        copy_to_dir_btn.clicked.connect(self.copy_playlist_to_dir)
         settings_btn.clicked.connect(self.open_settings)
 
         actions = QWidget()
         layout = QHBoxLayout(actions)
         layout.setContentsMargins(0, 0, 0, 0)
-        for button in (add_btn, load_btn, save_as_btn, settings_btn):
+        for button in (add_btn, load_btn, save_as_btn, copy_to_dir_btn, settings_btn):
             layout.addWidget(button)
         geometry = screen_geometry()
         if geometry:
@@ -88,6 +91,52 @@ class FileActionsMixin(WindowContext):
             return collect_audio_files(paths, on_progress, progress.wasCanceled)
         finally:
             progress.close()
+
+    def copy_playlist_to_dir(self):
+        """Copy the current playlist's files into a chosen directory; originals stay put."""
+        tracks = list(self.current_playlist().tracks)
+        if not tracks:
+            QMessageBox.information(self, "Copy files", "The playlist has no files to copy.")
+            return
+        target = QFileDialog.getExistingDirectory(self, "Copy files to directory")
+        if not target:
+            return
+
+        # QProgressDialog takes an int range, so count KiB to stay clear of overflow.
+        total_kib = max(1, total_bytes(tracks) // 1024)
+        progress = QProgressDialog(
+            f"Copying {len(tracks)} files to {target}...", "Cancel", 0, total_kib, self
+        )
+        progress.setWindowTitle("Copy files to dir")
+        progress.setWindowModality(Qt.WindowModal)
+        progress.setMinimumDuration(0)
+        progress.setAutoClose(False)
+        progress.setAutoReset(False)
+        progress.setValue(0)
+
+        def on_progress(done_bytes: int):
+            progress.setValue(min(total_kib, done_bytes // 1024))
+            QApplication.processEvents()
+
+        try:
+            result = copy_files(tracks, target, on_progress, progress.wasCanceled)
+        except OSError as error:
+            QMessageBox.warning(self, "Copy files", f"Could not copy to {target}:\n{error}")
+            return
+        finally:
+            progress.close()
+
+        lines = [f"Copied {len(result.copied)} of {len(tracks)} files to {target}."]
+        if result.cancelled:
+            lines.append("Copying was cancelled.")
+        if result.skipped:
+            lines.append(f"{len(result.skipped)} already existed there and were skipped.")
+        if result.missing:
+            lines.append(f"{len(result.missing)} could not be found.")
+        if result.failed:
+            lines.append(f"{len(result.failed)} failed to copy.")
+        notify = QMessageBox.warning if result.missing or result.failed else QMessageBox.information
+        notify(self, "Copy files", "\n".join(lines))
 
     def copy_selected_tracks(self):
         paths = selected_tracks(self.current_table())
