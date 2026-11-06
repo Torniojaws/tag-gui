@@ -1,6 +1,7 @@
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication, QLabel, QProgressBar, QVBoxLayout, QWidget
 
+from ..constants import APP_TITLE, APP_VERSION
 from .icons import note_pixmap
 
 
@@ -9,18 +10,22 @@ class Splash(QWidget):
 
     def __init__(self):
         super().__init__(None, Qt.SplashScreen | Qt.FramelessWindowHint)
-        self.setFixedSize(380, 210)
+        self.setFixedSize(380, 236)
 
         icon = QLabel()
         icon.setPixmap(note_pixmap(64))
         icon.setAlignment(Qt.AlignCenter)
 
-        title = QLabel("Tag GUI")
+        title = QLabel(APP_TITLE)
         title_font = title.font()
         title_font.setPointSize(18)
         title_font.setBold(True)
         title.setFont(title_font)
         title.setAlignment(Qt.AlignCenter)
+
+        self.version = QLabel(f"Version {APP_VERSION}")
+        self.version.setAlignment(Qt.AlignCenter)
+        self.version.setEnabled(False)
 
         self.status = QLabel("Starting...")
         self.status.setAlignment(Qt.AlignCenter)
@@ -38,6 +43,7 @@ class Splash(QWidget):
         layout.setSpacing(12)
         layout.addWidget(icon)
         layout.addWidget(title)
+        layout.addWidget(self.version)
         layout.addWidget(self.status)
         layout.addWidget(self.bar)
 

@@ -536,3 +536,11 @@ def test_shuffle_avoids_recent_artists_and_previous_walks_back(window, tmp_path,
     assert playing() == played[1]
     window.play_previous()
     assert playing() == played[0]
+
+
+def test_version_shows_in_window_title_and_splash(window):
+    from tag_gui import __version__
+    from tag_gui.ui.splash import Splash
+
+    assert __version__ in window.windowTitle()
+    assert __version__ in Splash().version.text()

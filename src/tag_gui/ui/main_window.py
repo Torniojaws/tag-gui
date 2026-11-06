@@ -5,7 +5,7 @@ from typing import List
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QDialog, QHBoxLayout, QMainWindow, QVBoxLayout, QWidget
 
-from ..constants import APP_TITLE
+from ..constants import WINDOW_TITLE
 from ..core.metadata import MetadataCache
 from ..core.models import Playlist
 from ..core.playlists import PlaylistStore
@@ -34,7 +34,7 @@ class MainWindow(
 ):
     def __init__(self, splash=None):
         QMainWindow.__init__(self)
-        self.setWindowTitle(APP_TITLE)
+        self.setWindowTitle(WINDOW_TITLE)
         self.data_dir = app_data_dir()
         self.custom_tags_file = self.data_dir / "custom_tags.txt"
         self.settings_file = self.data_dir / "settings.json"

@@ -1,7 +1,10 @@
 """Data rules: file types, columns and batching. Visual constants live in ui/styles.py."""
 
+from . import __version__ as APP_VERSION
+
 APP_ID = "tag-gui.tag-gui"
 APP_TITLE = "Tag GUI"
+WINDOW_TITLE = f"{APP_TITLE} {APP_VERSION}"
 
 AUDIO_EXTENSIONS = {".mp3", ".flac", ".fla", ".wma", ".aac"}
 AUDIO_FILE_FILTER = "Audio files (*.mp3 *.flac *.fla *.wma *.aac)"

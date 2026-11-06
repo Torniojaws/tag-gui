@@ -19,11 +19,11 @@ This is almost entirely AI-generated, so no warranties :D
 
 1. Open https://github.com/Torniojaws/tag-gui/releases
 2. Windows:
-   1. Download the file `tag-gui-<datetime>.exe` and run it
+   1. Download the file `tag-gui-v<version>.exe` (e.g. `tag-gui-v1.0.0.exe`) and run it
 3. For Debian-like (Linux Mint, Ubuntu, etc):
-   1. Download the file `tag-gui-<datetime>-linux`
-   2. Give it execute permissions with: `chmod +x tag-gui-<datetime>-linux`
-   3. And then run it with `./tag-gui-<datetime>-linux`
+   1. Download the file `tag-gui-v<version>` (e.g. `tag-gui-v1.0.0`)
+   2. Give it execute permissions with: `chmod +x tag-gui-v1.0.0`
+   3. And then run it with `./tag-gui-v1.0.0`
 
 ## Run
 
@@ -105,8 +105,12 @@ installation. PyInstaller is not a cross-compiler, so build on the platform you 
 
 Every push to `main` runs [.github/workflows/build.yml](.github/workflows/build.yml), which runs
 the test suite on Windows and Linux, then builds the executable on both and publishes them as a
-release tagged with the build time, e.g. `v202608101505` containing `tag-gui-202608101505.exe` and
-`tag-gui-202608101505-linux`. A failing test stops the build, so no release is published.
+release tagged with the app version, e.g. `v1.0.0` containing `tag-gui-v1.0.0.exe` and
+`tag-gui-v1.0.0`. The version comes from `__version__` in `src/tag_gui/__init__.py` (see
+[AGENTS.md](AGENTS.md) for when to bump it). If a release of that version already exists, the
+patch number is increased until it is free (`v1.0.1`, `v1.0.2`, ...) and the build is stamped
+with that version, so the app always shows the version it was released as. A failing test stops
+the build, so no release is published.
 Releases are linked from the repository front page; the same files are also attached to the
 workflow run as artifacts.
 
@@ -130,7 +134,7 @@ workflow run as artifacts.
 - Custom tag value `X` means checked; unchecking removes the tag from the file, checking writes it back
 - Rows are shaded per album run: the shade flips whenever the album changes, so consecutive tracks of one album share a background
 - Sortable/resizable columns with horizontal scrolling; a header click sorts descending first (checked tags on top) and scrolls back to the top
-- Splash screen with a progress bar while playlists load at startup
+- Splash screen with the app version and a progress bar while playlists load at startup; the version is also shown in the window title
 - Tags read from files are cached in `metadata.json` under app data and reused until a file's timestamp changes, so restarts do not re-read every file
 - Tabbed M3U playlists persisted between sessions (`default.m3u`, `default2.m3u`, ...)
 - Double-click empty tab bar space to add the next `defaultN` playlist

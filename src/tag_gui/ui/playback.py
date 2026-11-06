@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
     QTextEdit,
 )
 
-from ..constants import ALBUM_COLUMN, APP_TITLE, ARTIST_COLUMN, PATH_COLUMN, SONG_COLUMN
+from ..constants import ALBUM_COLUMN, ARTIST_COLUMN, PATH_COLUMN, SONG_COLUMN, WINDOW_TITLE
 from ..core.settings import save_settings
 from ..core.shuffle import TrackKey, pick_next
 from ..core.utils import seconds_to_mmss
@@ -225,13 +225,13 @@ class PlaybackMixin(WindowContext):
         self.transport.set_playing(state == QMediaPlayer.PlayingState)
         source = self.player.source().toLocalFile()
         if not source:
-            self.setWindowTitle(APP_TITLE)
+            self.setWindowTitle(WINDOW_TITLE)
         elif state == QMediaPlayer.PlayingState:
-            self.setWindowTitle(f"{APP_TITLE} - {PLAY_GLYPH} Playing: {self.playing_title(source)}")
+            self.setWindowTitle(f"{WINDOW_TITLE} - {PLAY_GLYPH} Playing: {self.playing_title(source)}")
         elif state == QMediaPlayer.PausedState:
-            self.setWindowTitle(f"{APP_TITLE} - {PAUSE_GLYPH} Paused: {self.playing_title(source)}")
+            self.setWindowTitle(f"{WINDOW_TITLE} - {PAUSE_GLYPH} Paused: {self.playing_title(source)}")
         else:
-            self.setWindowTitle(APP_TITLE)
+            self.setWindowTitle(WINDOW_TITLE)
 
     def on_media_status_changed(self, status):
         if status == QMediaPlayer.EndOfMedia:

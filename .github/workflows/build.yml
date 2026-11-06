@@ -18,8 +18,28 @@ jobs:
     outputs:
       value: ${{ steps.version.outputs.value }}
     steps:
+      - uses: actions/checkout@v4
+
+      # The app version comes from src/tag_gui/__init__.py. When a release of it already
+      # exists (a push without a version bump), the patch number goes up until it is free.
       - id: version
-        run: echo "value=$(date -u +%Y%m%d%H%M)" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(sed -nE 's/^__version__ = "([0-9]+\.[0-9]+\.[0-9]+)"$/\1/p' src/tag_gui/__init__.py)
+          if [ -z "$version" ]; then
+            echo "::error::No MAJOR.MINOR.PATCH __version__ in src/tag_gui/__init__.py"
+            exit 1
+          fi
+          base=${version%.*}
+          patch=${version##*.}
+          while gh release view "v$base.$patch" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; do
+            patch=$((patch + 1))
+          done
+          if [ "$base.$patch" != "$version" ]; then
+            echo "::notice::Release v$version exists, publishing as v$base.$patch"
+          fi
+          echo "value=$base.$patch" >> "$GITHUB_OUTPUT"
 
   test:
     strategy:
@@ -64,10 +84,10 @@ jobs:
         include:
           - os: windows-latest
             built: dist/tag-gui.exe
-            asset: tag-gui-${{ needs.version.outputs.value }}.exe
+            asset: tag-gui-v${{ needs.version.outputs.value }}.exe
           - os: ubuntu-latest
             built: dist/tag-gui
-            asset: tag-gui-${{ needs.version.outputs.value }}-linux
+            asset: tag-gui-v${{ needs.version.outputs.value }}
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -96,10 +116,16 @@ jobs:
       - name: Install dependencies
         run: python build.py deps
 
+      # An auto-bumped patch release must also show its own version inside the app.
+      - name: Stamp the release version
+        env:
+          VERSION: ${{ needs.version.outputs.value }}
+        run: sed -i -E "s/^__version__ = .*/__version__ = \"$VERSION\"/" src/tag_gui/__init__.py
+
       - name: Build executable
         run: python build.py build
 
-      - name: Name executable after the build time
+      - name: Name executable after the version
         run: mv "${{ matrix.built }}" "dist/${{ matrix.asset }}"
 
       - uses: actions/upload-artifact@v4
@@ -124,6 +150,6 @@ jobs:
         run: >
           gh release create "v$VERSION" dist/*
           --repo "$GITHUB_REPOSITORY"
-          --title "tag-gui $VERSION"
+          --title "tag-gui v$VERSION"
           --notes "Automated Windows and Linux builds from $GITHUB_SHA."
           --latest
