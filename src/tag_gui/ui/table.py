@@ -152,6 +152,13 @@ class PlaylistTable(QTableWidget):
         if event.key() == Qt.Key_Delete and not event.modifiers():
             self.on_delete_pressed()
             return
+        # Plain Home/End would only jump between columns of the current row.
+        if event.key() == Qt.Key_Home and not event.modifiers():
+            self.scrollToTop()
+            return
+        if event.key() == Qt.Key_End and not event.modifiers():
+            self.scrollToBottom()
+            return
         if event.matches(QKeySequence.Copy):
             self.on_copy_pressed()
             return

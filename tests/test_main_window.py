@@ -88,6 +88,24 @@ def test_copy_paste_moves_selected_tracks_to_another_playlist(window, tmp_path, 
     assert window.current_table().rowCount() == 2
 
 
+def test_home_and_end_scroll_the_playlist(window, tmp_path, monkeypatch):
+    songs = [str(write_flac(tmp_path / f"song{i}.flac")) for i in range(60)]
+    monkeypatch.setattr(MainWindow, "scan_for_audio_files", lambda self, paths: list(paths))
+    window.add_tracks_to_current_playlist(songs)
+    window.resize(800, 400)
+    window.show()
+    table = window.current_table()
+    table.selectRow(5)
+    bar = table.verticalScrollBar()
+    assert bar.maximum() > 0
+
+    QTest.keyClick(table, Qt.Key_End)
+    assert bar.value() == bar.maximum()
+    QTest.keyClick(table, Qt.Key_Home)
+    assert bar.value() == bar.minimum()
+    assert [i.row() for i in table.selectionModel().selectedRows()] == [5]
+
+
 def test_copy_files_to_dir_copies_the_playlist(window, tmp_path, monkeypatch):
     from tag_gui.ui import file_actions
 
