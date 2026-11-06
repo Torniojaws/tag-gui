@@ -3,7 +3,14 @@
 from typing import List
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QDialog, QHBoxLayout, QMainWindow, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QDialog,
+    QHBoxLayout,
+    QMainWindow,
+    QMessageBox,
+    QVBoxLayout,
+    QWidget,
+)
 
 from ..constants import WINDOW_TITLE
 from ..core.metadata import MetadataCache
@@ -13,6 +20,7 @@ from ..core.settings import load_settings, save_settings
 from ..core.utils import app_data_dir
 from .dialogs import SettingsDialog
 from .file_actions import FileActionsMixin
+from .lastfm import LastfmController
 from .playback import PlaybackMixin
 from .playlist_actions import PlaylistActionsMixin
 from .progress import progress_reporter
@@ -48,6 +56,8 @@ class MainWindow(
         self.metadata = MetadataCache(self.data_dir / "metadata.json")
         self.metadata.load()
 
+        self.lastfm = LastfmController(self.data_dir, self)
+        self.lastfm.session_lost.connect(self.on_lastfm_session_lost)
         self._build_player()
         self._build_playback_widgets()
         self._build_tabs()
@@ -92,7 +102,7 @@ class MainWindow(
     # --------------------------------------------------------------- settings
 
     def open_settings(self):
-        dialog = SettingsDialog(self.settings, self)
+        dialog = SettingsDialog(self.settings, self, lastfm=self.lastfm)
         if dialog.exec() != QDialog.Accepted:
             return
         self.settings = dialog.settings()
@@ -166,8 +176,17 @@ class MainWindow(
         self.store.save(self.tabs.currentIndex())
         self.metadata.save(keep=self.store.all_tracks())
 
+    def on_lastfm_session_lost(self):
+        QMessageBox.warning(
+            self,
+            "Last.fm",
+            "Last.fm no longer accepts this app's login, so scrobbling has stopped.\n"
+            "Connect again in Settings; plays since then are kept and sent afterwards.",
+        )
+
     def closeEvent(self, event):
         self.cancel_sorting()
+        self.lastfm.shutdown()
         self.save_custom_tags()
         self.save_state()
         self.metadata.save()

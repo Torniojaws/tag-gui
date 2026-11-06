@@ -48,7 +48,13 @@ src/tag_gui/
         tags.py            mutagen reads/writes, custom tag normalization
         metadata.py        cached track fields and tag states
         scanning.py        recursive audio file collection
-        settings.py        user settings (skip step, timebar position) in settings.json
+        settings.py        user settings (skip step, timebar position, shuffle) in settings.json
+        copying.py         copying playlist files to another directory
+        sorting.py         playlist orders: by path, random, by release year
+        shuffle.py         shuffle picks avoiding recent artists, albums and songs
+        lastfm.py          Last.fm API client: signing, browser login, scrobbles
+        listening.py       when a play counts as a scrobble
+        scrobbling.py      scrobble queue that survives being offline
         utils.py           app data dir, slugify, mm:ss formatting
     ui/
         styles.py          colours, glyphs, sizes
@@ -60,9 +66,13 @@ src/tag_gui/
         table_fill.py      filling and refreshing rows
         tabs.py            renameable tab bar
         sliders.py         seek bar with in-bar time text
-        transport.py       previous/play/stop/next
+        transport.py       previous/play/stop/next and the shuffle checkbox
         volume.py          volume slider and mute
         progress.py        splash/dialog progress reporting
+        spinner.py         small busy indicator
+        search.py          Ctrl+F filter bar
+        sorting.py         sort dropdown and background year sort
+        lastfm.py          Last.fm login state, play tracking and network thread
         window_base.py     state shared by the window slices
         playlist_actions.py  tab bar and playlist commands
         file_actions.py    add/load/save row, adding and removing tracks
@@ -102,6 +112,19 @@ pyinstaller --noconfirm --clean --onefile --windowed --icon tag-gui.ico --name t
 The binary is written to `dist/tag-gui` (`dist\tag-gui.exe` on Windows) and needs no Python
 installation. PyInstaller is not a cross-compiler, so build on the platform you target.
 
+### Last.fm API key
+
+Scrobbling needs the app's Last.fm API key and shared secret in `src/tag_gui/_lastfm_keys.py`:
+
+```python
+API_KEY = "..."
+API_SECRET = "..."
+```
+
+The file is gitignored and must never be committed. GitHub builds write it from the repository
+secrets `LASTFM_API_KEY` and `LASTFM_API_SECRET` (Settings -> Secrets and variables -> Actions).
+Without it the app works normally and the Settings window shows scrobbling as unavailable.
+
 ## Automated builds
 
 Every push, on any branch, runs the test suite on Windows and Linux with
@@ -134,6 +157,7 @@ workflow run as artifacts.
 - Standard tags are edited via right-click -> Edit tags, which writes only the fields you changed, across every selected row (Duration is read-only)
 - Double-click row to play, plus Previous/Play/Pause/Stop/Next controls
 - Shuffle checkbox next to the Next button (remembered between sessions): Next and the end of a song pick a random visible track that shares no artist, album or song with the last 10 played, preferring tracks not yet heard this round. Songs are matched fuzzily, so `Song (Cover)`, `Song - Live 2018` and `Song Live at Wembley` count as `Song`. If everything clashes (e.g. a single-artist playlist) it relaxes the rule instead of stopping. Previous steps back through the tracks that actually played
+- Last.fm scrobbling: Settings -> Connect to Last.fm opens last.fm in the browser, where you allow Tag GUI; the app never sees your password and keeps only the session key (`lastfm.json` under app data). Each track sends "now playing" and is scrobbled once it has played for half its length or 4 minutes (tracks of 30 s or less never count). Only time actually played counts, so pausing or skipping ahead does not, and files without artist and title tags are not scrobbled. Network calls run in the background; plays that cannot be sent (offline, Last.fm down, logged out) are kept in `scrobble_queue.json` and sent later
 - Clickable seek/progress bar, shown at the top, bottom or both (Settings...)
 - While a song plays, `Left`/`Right` skip back/forward by a configurable step (1-60 s, default 5); skipping stops at the start of the song, and skipping past the end starts the next song, which a held key does not keep scrubbing
 - Custom checkbox-tag columns via comma-separated textbox (persisted in `custom_tags.txt` under app data)

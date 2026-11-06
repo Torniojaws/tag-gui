@@ -56,6 +56,9 @@ def build() -> None:
     if WINDOWS:
         # PyInstaller only embeds an .ico into the executable on Windows.
         args += ["--icon", ICON.name]
+    if (ROOT / "src" / "tag_gui" / "_lastfm_keys.py").exists():
+        # Imported lazily and optionally, so make sure PyInstaller bundles it.
+        args += ["--hidden-import", "tag_gui._lastfm_keys"]
     args += ["--name", APP, "app.py"]
     run(*args)
 

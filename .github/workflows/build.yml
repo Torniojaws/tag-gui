@@ -96,6 +96,18 @@ jobs:
           VERSION: ${{ needs.version.outputs.value }}
         run: sed -i -E "s/^__version__ = .*/__version__ = \"$VERSION\"/" src/tag_gui/__init__.py
 
+      # The key and secret live in repository secrets, never in the repository itself.
+      - name: Add the Last.fm API key
+        env:
+          LASTFM_API_KEY: ${{ secrets.LASTFM_API_KEY }}
+          LASTFM_API_SECRET: ${{ secrets.LASTFM_API_SECRET }}
+        run: |
+          if [ -z "$LASTFM_API_KEY" ] || [ -z "$LASTFM_API_SECRET" ]; then
+            echo "::warning::LASTFM_API_KEY / LASTFM_API_SECRET secrets are not set, so this build cannot scrobble"
+            exit 0
+          fi
+          python -c "import os; open('src/tag_gui/_lastfm_keys.py', 'w').write('API_KEY = %r\nAPI_SECRET = %r\n' % (os.environ['LASTFM_API_KEY'], os.environ['LASTFM_API_SECRET']))"
+
       - name: Build executable
         run: python build.py build
 

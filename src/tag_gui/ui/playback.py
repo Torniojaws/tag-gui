@@ -123,6 +123,7 @@ class PlaybackMixin(WindowContext):
         self.current_track_index = row
         self.player.setSource(QUrl.fromLocalFile(file_path))
         self.player.play()
+        self.lastfm.track_started(file_path)
         table.selectRow(row)
         if remember:
             self._history.append(file_path)
@@ -223,6 +224,7 @@ class PlaybackMixin(WindowContext):
 
     def on_playback_state_changed(self, state):
         self.transport.set_playing(state == QMediaPlayer.PlayingState)
+        self.lastfm.set_playing(state == QMediaPlayer.PlayingState)
         source = self.player.source().toLocalFile()
         if not source:
             self.setWindowTitle(WINDOW_TITLE)
@@ -238,6 +240,7 @@ class PlaybackMixin(WindowContext):
             self.play_next()
 
     def on_position_changed(self, position: int):
+        self.lastfm.tick()
         duration = self.player.duration() or 0
         text = f"{seconds_to_mmss(position / 1000)} / {seconds_to_mmss(duration / 1000)}"
         for bar in self.seek_bars():
@@ -246,6 +249,7 @@ class PlaybackMixin(WindowContext):
             bar.set_text(text)
 
     def on_duration_changed(self, duration: int):
+        self.lastfm.set_duration(duration)
         for bar in self.seek_bars():
             bar.setRange(0, max(0, duration))
 

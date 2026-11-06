@@ -64,6 +64,7 @@ MUTE_ICON_COLOR = "#b04a45"
 
 # The "Sorting completed" note stays this long, then fades out.
 SORT_DONE_COLOR = "#2e9d47"
+ERROR_COLOR = "#b04a45"
 SORT_DONE_VISIBLE_MS = 5000
 SORT_DONE_FADE_MS = 800
 SPINNER_SIZE = 16

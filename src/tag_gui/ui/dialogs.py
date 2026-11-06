@@ -1,4 +1,5 @@
 from dataclasses import replace
+from html import escape
 from typing import Dict, List, Sequence
 
 from PySide6.QtWidgets import (
@@ -6,14 +7,17 @@ from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QFormLayout,
+    QGroupBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QPushButton,
     QVBoxLayout,
 )
 
 from ..constants import DEFAULT_COLUMNS, STANDARD_TAG_FIELDS
 from ..core.settings import SKIP_SECONDS_MAX, SKIP_SECONDS_MIN, Settings, parse_skip_seconds
+from .styles import ERROR_COLOR
 
 DIGITS = "0123456789"
 
@@ -93,8 +97,85 @@ class SkipSecondsInput(QLineEdit):
         self.setCursorPosition(max(0, min(cursor, len(new_text))))
 
 
+class LastfmBox(QGroupBox):
+    """Connect/disconnect scrobbling. Login happens on last.fm in the browser."""
+
+    def __init__(self, lastfm=None, parent=None):
+        super().__init__("Last.fm scrobbling", parent)
+        self._lastfm = lastfm
+        self.status = QLabel()
+        self.status.setWordWrap(True)
+        self.status.setOpenExternalLinks(True)
+        self.connect_button = QPushButton("Connect to Last.fm...")
+        self.disconnect_button = QPushButton("Disconnect")
+        self.cancel_button = QPushButton("Cancel")
+        self.error = QLabel()
+        self.error.setWordWrap(True)
+        self.error.setStyleSheet(f"color: {ERROR_COLOR};")
+        self.error.hide()
+
+        buttons = QHBoxLayout()
+        for button in (self.connect_button, self.disconnect_button, self.cancel_button):
+            buttons.addWidget(button)
+        buttons.addStretch(1)
+        layout = QVBoxLayout(self)
+        layout.addWidget(self.status)
+        layout.addWidget(self.error)
+        layout.addLayout(buttons)
+
+        if lastfm is None or not lastfm.available:
+            self.status.setText("Not available in this build (it has no Last.fm API key).")
+            for button in (self.connect_button, self.disconnect_button, self.cancel_button):
+                button.hide()
+            return
+        self.connect_button.clicked.connect(self._connect)
+        self.disconnect_button.clicked.connect(lastfm.disconnect_account)
+        self.cancel_button.clicked.connect(self._cancel)
+        lastfm.account_changed.connect(self._show_account)
+        lastfm.login_waiting.connect(self._show_waiting)
+        lastfm.login_finished.connect(self._on_login_finished)
+        self._show_account()
+
+    def _connect(self):
+        self.error.hide()
+        self.status.setText("Contacting Last.fm...")
+        self.connect_button.setEnabled(False)
+        self._lastfm.connect_account()
+
+    def _cancel(self):
+        self._lastfm.cancel_login()
+        self._show_account()
+
+    def _show_waiting(self, url: str):
+        self.status.setText(
+            "Click <b>Yes, allow access</b> on the Last.fm page that opened in your browser. "
+            f'<a href="{url}">Open the page again</a>'
+        )
+        self.connect_button.hide()
+        self.disconnect_button.hide()
+        self.cancel_button.show()
+
+    def _on_login_finished(self, ok: bool, message: str):
+        if not ok:
+            self.error.setText(f"Could not connect: {message}")
+            self.error.show()
+        self._show_account()
+
+    def _show_account(self):
+        connected = self._lastfm.connected
+        if connected:
+            self.status.setText(f"Scrobbling as <b>{escape(self._lastfm.username)}</b>")
+            self.error.hide()
+        else:
+            self.status.setText("Not connected. Plays are scrobbled once you connect.")
+        self.connect_button.setEnabled(True)
+        self.connect_button.setVisible(not connected)
+        self.disconnect_button.setVisible(connected)
+        self.cancel_button.hide()
+
+
 class SettingsDialog(QDialog):
-    def __init__(self, settings: Settings, parent=None):
+    def __init__(self, settings: Settings, parent=None, lastfm=None):
         super().__init__(parent)
         self.setWindowTitle("Settings")
         self._original = settings
@@ -123,8 +204,11 @@ class SettingsDialog(QDialog):
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
 
+        self.lastfm_box = LastfmBox(lastfm)
+
         layout = QVBoxLayout(self)
         layout.addLayout(form)
+        layout.addWidget(self.lastfm_box)
         layout.addWidget(buttons)
 
     def _keep_one_timebar(self):

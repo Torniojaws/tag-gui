@@ -544,3 +544,20 @@ def test_version_shows_in_window_title_and_splash(window):
 
     assert __version__ in window.windowTitle()
     assert __version__ in Splash().version.text()
+
+
+def test_playback_feeds_the_last_fm_play_tracker(window, tmp_path, monkeypatch):
+    monkeypatch.setattr(MainWindow, "scan_for_audio_files", lambda self, paths: list(paths))
+    monkeypatch.setattr(window.player, "play", lambda: None)
+    songs = [str(write_flac(tmp_path / f"song{i}.flac")) for i in range(2)]
+    window.add_tracks_to_current_playlist(songs)
+
+    window.play_row(1)
+    tracker = window.lastfm.tracker
+    assert tracker.track == songs[1]
+    window.on_duration_changed(180_000)
+    assert tracker.duration_ms == 180_000
+    window.on_playback_state_changed(QMediaPlayer.PausedState)
+    paused = tracker.listened_ms()
+    QTest.qWait(50)
+    assert tracker.listened_ms() == paused

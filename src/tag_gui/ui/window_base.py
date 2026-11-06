@@ -14,6 +14,7 @@ from ..core.metadata import MetadataCache
 from ..core.models import Playlist
 from ..core.playlists import PlaylistStore
 from ..core.settings import Settings
+from .lastfm import LastfmController
 from .sliders import SeekSlider
 from .table import PlaylistTable
 from .tabs import PlaylistTabs
@@ -33,6 +34,7 @@ class WindowContext(QMainWindow):
     current_track_index: int
     _updating_table: bool
 
+    lastfm: LastfmController
     player: QMediaPlayer
     audio_output: QAudioOutput
     tabs: PlaylistTabs

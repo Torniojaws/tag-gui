@@ -216,3 +216,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Last.fm API key and secret, written by CI from repository secrets (never commit)
+src/tag_gui/_lastfm_keys.py

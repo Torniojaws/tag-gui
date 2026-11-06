@@ -18,3 +18,9 @@ not need a bump. When one task contains several changes, bump once, by the large
 GitHub releases are named after this version: `vX.Y.Z` with the files `tag-gui-vX.Y.Z` (Linux)
 and `tag-gui-vX.Y.Z.exe`. If a release of the version already exists, CI publishes the next free
 patch version instead and stamps it into the build; the source file is not changed by CI.
+
+## Secrets
+
+The Last.fm API key and shared secret live only in the gitignored
+`src/tag_gui/_lastfm_keys.py` locally and in the `LASTFM_API_KEY` / `LASTFM_API_SECRET`
+repository secrets in CI. Never commit them or copy them into any tracked file.
