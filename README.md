@@ -25,6 +25,8 @@ This is almost entirely AI-generated, so no warranties :D
    1. Download the file `tag-gui-v<version>` (e.g. `tag-gui-v1.0.0`)
    2. Give it execute permissions with: `chmod +x tag-gui-v1.0.0`
    3. And then run it with `./tag-gui-v1.0.0`
+4. Optional: to scrobble to Last.fm, open Settings -> Connect to Last.fm... and allow Tag GUI in
+   the browser. No API key or other setup is needed with the released builds.
 
 ## Run
 
@@ -112,18 +114,26 @@ pyinstaller --noconfirm --clean --onefile --windowed --icon tag-gui.ico --name t
 The binary is written to `dist/tag-gui` (`dist\tag-gui.exe` on Windows) and needs no Python
 installation. PyInstaller is not a cross-compiler, so build on the platform you target.
 
-### Last.fm API key
+### Last.fm API key (only when running or building from source)
 
-Scrobbling needs the app's Last.fm API key and shared secret in `src/tag_gui/_lastfm_keys.py`:
+If you use a downloaded release, skip this section: the released builds already contain the
+app's Last.fm API key, so you only need to click Settings -> Connect to Last.fm... and allow Tag
+GUI on last.fm with your own account.
+
+Running `python app.py` or building your own executable needs the API key and shared secret in
+`src/tag_gui/_lastfm_keys.py`:
 
 ```python
 API_KEY = "..."
 API_SECRET = "..."
 ```
 
-The file is gitignored and must never be committed. GitHub builds write it from the repository
-secrets `LASTFM_API_KEY` and `LASTFM_API_SECRET` (Settings -> Secrets and variables -> Actions).
-Without it the app works normally and the Settings window shows scrobbling as unavailable.
+Use your own key from https://www.last.fm/api/account/create. The file is gitignored and must
+never be committed. Without it the app works normally, and the Settings window shows scrobbling
+as unavailable.
+
+The GitHub release builds write this file from the repository secrets `LASTFM_API_KEY` and
+`LASTFM_API_SECRET` (Settings -> Secrets and variables -> Actions -> Repository secrets).
 
 ## Automated builds
 
