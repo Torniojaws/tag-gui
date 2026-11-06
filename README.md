@@ -11,7 +11,8 @@ Features:
 
 This is almost entirely AI-generated, so no warranties :D
 
-[![Tests and build](https://github.com/Torniojaws/tag-gui/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/Torniojaws/tag-gui/actions/workflows/build.yml)
+[![Tests](https://github.com/Torniojaws/tag-gui/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/Torniojaws/tag-gui/actions/workflows/tests.yml)
+[![Build and release](https://github.com/Torniojaws/tag-gui/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/Torniojaws/tag-gui/actions/workflows/build.yml)
 
 <img width="3838" height="2108" alt="image" src="https://github.com/user-attachments/assets/5c2aab1a-f2c7-493f-85ec-eeb473df9106" />
 
@@ -103,10 +104,16 @@ installation. PyInstaller is not a cross-compiler, so build on the platform you 
 
 ## Automated builds
 
-Every push to `main` runs [.github/workflows/build.yml](.github/workflows/build.yml), which runs
-the test suite on Windows and Linux, then builds the executable on both and publishes them as a
-release tagged with the app version, e.g. `v1.0.0` containing `tag-gui-v1.0.0.exe` and
-`tag-gui-v1.0.0`. The version comes from `__version__` in `src/tag_gui/__init__.py` (see
+Every push, on any branch, runs the test suite on Windows and Linux with
+[.github/workflows/tests.yml](.github/workflows/tests.yml), unless it only changes Markdown files
+(such as this README) or `LICENSE`. That workflow never builds or releases anything.
+
+Pushes to `main` that change the app also run
+[.github/workflows/build.yml](.github/workflows/build.yml); pushes that only change Markdown files,
+`LICENSE` or files under `tests/` skip it. It runs the same test workflow first, then builds the
+executable on Windows and Linux and publishes them as a release tagged with the app version, e.g.
+`v1.0.0` containing `tag-gui-v1.0.0.exe` and `tag-gui-v1.0.0`. The version comes from
+`__version__` in `src/tag_gui/__init__.py` (see
 [AGENTS.md](AGENTS.md) for when to bump it). If a release of that version already exists, the
 patch number is increased until it is free (`v1.0.1`, `v1.0.2`, ...) and the build is stamped
 with that version, so the app always shows the version it was released as. A failing test stops
