@@ -37,6 +37,7 @@ class WindowContext(QMainWindow):
     audio_output: QAudioOutput
     tabs: PlaylistTabs
     tags_input: QLineEdit
+    search_input: QLineEdit
     transport: TransportBar
     volume: VolumeControls
     progress_top: SeekSlider
@@ -74,4 +75,10 @@ class WindowContext(QMainWindow):
         raise NotImplementedError
 
     def play_next(self) -> None:
+        raise NotImplementedError
+
+    def apply_search_to_current(self) -> None:
+        raise NotImplementedError
+
+    def update_search_count(self) -> None:
         raise NotImplementedError

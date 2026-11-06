@@ -36,9 +36,12 @@ def rows_by_track(table: PlaylistTable) -> Dict[str, int]:
 
 
 def selected_tracks(table: PlaylistTable) -> List[str]:
+    """Selected tracks, leaving out rows hidden by the filter (Ctrl+A still selects those)."""
     tracks = []
     seen = set()
     for row in sorted({index.row() for index in table.selectedIndexes()}):
+        if table.isRowHidden(row):
+            continue
         track = track_of(table.item(row, PATH_COLUMN))
         if track and track not in seen:
             seen.add(track)
@@ -112,6 +115,7 @@ def fill_table(
             table.setItem(row, column, _tag_item(track, tag, bool(info.tag_states.get(tag))))
 
     table.reapply_sort()
+    table.refresh_filter()
     table.apply_album_colors()
     table.resizeColumnsToContents()
     width = table.fontMetrics().horizontalAdvance("00:00") + DURATION_COLUMN_PADDING
@@ -138,3 +142,4 @@ def refresh_rows(
             if item:
                 item.setText(value)
     table.apply_album_colors()
+    table.refresh_filter()

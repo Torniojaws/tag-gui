@@ -117,6 +117,7 @@ workflow run as artifacts.
 - Dropped folders are scanned recursively with a cancellable progress dialog; tags are then read in batches so large trees stay responsive
 - Select rows (shift/ctrl click, `Ctrl+A`) and press `Delete` to remove them; removing several asks for confirmation
 - `Home`/`End` scroll the playlist to the top/bottom without changing the selection
+- `Ctrl+F` opens a filter bar above the playlists and `Ctrl+F` (or `Esc`) closes it again; the list narrows as you type to rows whose Artist, Song or Album contains the text (case-insensitive), shows the match count, and clearing or closing the filter brings back the full list. Next/Previous play only the visible rows, and selection-based actions (Delete, copy, Edit tags) ignore hidden rows
 - Playlist columns: Artist, Duration, Song, Year, Album
 - Standard tags are edited via right-click -> Edit tags, which writes only the fields you changed, across every selected row (Duration is read-only)
 - Double-click row to play, plus Previous/Play/Pause/Stop/Next controls

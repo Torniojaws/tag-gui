@@ -132,18 +132,25 @@ class PlaybackMixin(WindowContext):
             self.play_row(selected)
 
     def play_next(self):
-        table = self.current_table()
-        if table.rowCount() == 0:
-            return
-        next_index = 0 if self.current_track_index < 0 else self.current_track_index + 1
-        self.play_row(0 if next_index >= table.rowCount() else next_index)
+        self._play_step(1)
 
     def play_previous(self):
+        self._play_step(-1)
+
+    def _play_step(self, direction: int):
+        """Play the next/previous row that the filter leaves visible, wrapping around."""
         table = self.current_table()
-        if table.rowCount() == 0:
+        rows = table.rowCount()
+        if rows == 0:
             return
-        last = table.rowCount() - 1
-        self.play_row(last if self.current_track_index <= 0 else self.current_track_index - 1)
+        current = self.current_track_index
+        # From no track (or the first one), previous wraps to the last row.
+        start = max(current, 0) if direction < 0 else current
+        for step in range(1, rows + 1):
+            row = (start + direction * step) % rows
+            if not table.isRowHidden(row):
+                self.play_row(row)
+                return
 
     def playing_title(self, file_path: str) -> str:
         info = self.metadata.get(file_path, self.custom_tags)

@@ -23,6 +23,8 @@ PATH_COLUMN = 0
 LEFT_ALIGNED_HEADERS = tuple(
     DEFAULT_COLUMNS.index(name) for name in ("Artist", "Duration", "Song", "Album")
 )
+# The Ctrl+F filter keeps rows where any of these columns contains the search term.
+SEARCH_COLUMNS = (ARTIST_COLUMN, SONG_COLUMN, ALBUM_COLUMN)
 
 # Rows are filled in chunks of this size so the progress dialog stays responsive.
 POPULATE_BATCH = 25

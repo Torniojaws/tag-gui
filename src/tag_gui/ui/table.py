@@ -1,6 +1,7 @@
 from pathlib import Path
+from typing import List, Optional
 
-from PySide6.QtCore import QEvent, QRect, Qt
+from PySide6.QtCore import QEvent, QRect, Qt, Signal
 from PySide6.QtGui import QBrush, QColor, QKeySequence
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -15,7 +16,7 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
 )
 
-from ..constants import ALBUM_COLUMN, AUDIO_EXTENSIONS
+from ..constants import ALBUM_COLUMN, AUDIO_EXTENSIONS, SEARCH_COLUMNS
 from .styles import ALBUM_TINT_DARK, ALBUM_TINT_LIGHT, SELECTION_STYLE
 
 # Rows that auto-size against every entry are too slow for large playlists.
@@ -79,6 +80,9 @@ class CenteredCheckDelegate(QStyledItemDelegate):
 
 
 class PlaylistTable(QTableWidget):
+    # Emitted after the filter is re-run, so the search bar can update its match count.
+    filter_applied = Signal()
+
     def __init__(
         self, on_files_dropped, on_delete_pressed, on_copy_pressed, on_paste_pressed, parent=None
     ):
@@ -109,6 +113,12 @@ class PlaylistTable(QTableWidget):
         self.horizontalHeader().setSortIndicatorShown(True)
         self.horizontalHeader().sectionClicked.connect(self.sort_by_column)
 
+        self._filter_term = ""
+        # Lowercased searchable columns per row, rebuilt lazily after rows change or move. The
+        # columns are joined by newlines, which a single-line search term can never span.
+        self._search_texts: Optional[List[str]] = None
+        self.visible_rows = 0
+
     def sort_by_column(self, column: int):
         if column == self._sort_column and self._sort_order == Qt.DescendingOrder:
             order = Qt.AscendingOrder
@@ -119,11 +129,55 @@ class PlaylistTable(QTableWidget):
         self.horizontalHeader().setSortIndicator(column, order)
         self.sortItems(column, order)
         self.apply_album_colors()
+        self.refresh_filter()
         self.scrollToTop()
 
     def reapply_sort(self):
         if self._sort_column >= 0:
             self.sortItems(self._sort_column, self._sort_order)
+
+    def set_filter(self, text: str):
+        """Show only rows where artist, song or album contains ``text``, ignoring case."""
+        term = text.strip().casefold()
+        if term != self._filter_term:
+            self._filter_term = term
+            self.apply_filter()
+
+    def refresh_filter(self):
+        """Re-run the filter after rows were filled, re-sorted or edited."""
+        self._search_texts = None
+        self.apply_filter()
+
+    def _build_search_texts(self) -> List[str]:
+        columns = [col for col in SEARCH_COLUMNS if col < self.columnCount()]
+        texts = []
+        for row in range(self.rowCount()):
+            parts = []
+            for col in columns:
+                item = self.item(row, col)
+                if item:
+                    parts.append(item.text())
+            texts.append("\n".join(parts).casefold())
+        return texts
+
+    def apply_filter(self):
+        if self._search_texts is None or len(self._search_texts) != self.rowCount():
+            self._search_texts = self._build_search_texts()
+        term = self._filter_term
+        visible = 0
+        # Each setRowHidden would otherwise relayout the view; batching keeps big lists instant.
+        self.setUpdatesEnabled(False)
+        try:
+            for row, text in enumerate(self._search_texts):
+                hide = bool(term) and term not in text
+                if self.isRowHidden(row) != hide:
+                    self.setRowHidden(row, hide)
+                if not hide:
+                    visible += 1
+        finally:
+            self.setUpdatesEnabled(True)
+        self.visible_rows = visible
+        self.filter_applied.emit()
 
     def apply_album_colors(self):
         """Shade consecutive rows of one album alike, flipping shade at every album change."""

@@ -243,3 +243,113 @@ def test_timebar_settings_show_the_chosen_bars(window):
     window.apply_settings()
     assert not window.progress_top.isHidden()
     assert not window.progress_bottom.isHidden()
+
+
+def tagged_songs(tmp_path, rows):
+    from tag_gui.core.tags import set_standard_tags
+
+    songs = []
+    for index, (artist, title, album, year) in enumerate(rows):
+        song = write_flac(tmp_path / f"tagged{index}.flac")
+        set_standard_tags(song, {"artist": artist, "title": title, "album": album, "date": year})
+        songs.append(str(song))
+    return songs
+
+
+@pytest.fixture
+def filtered_window(window, tmp_path, monkeypatch):
+    songs = tagged_songs(
+        tmp_path,
+        [
+            ("Iron Maiden", "Aces High", "Powerslave", "1984"),
+            ("Metallica", "One", "...And Justice for All", "1988"),
+            ("Maiden Voyage", "Iron Man", "Iron", "1999"),
+            ("Slayer", "Angel of Death", "Reign in Blood", "1986"),
+        ],
+    )
+    monkeypatch.setattr(MainWindow, "scan_for_audio_files", lambda self, paths: list(paths))
+    window.add_tracks_to_current_playlist(songs)
+    window.show()
+    window.activateWindow()
+    QTest.qWaitForWindowActive(window)
+    return window
+
+
+def visible_artists(window):
+    table = window.current_table()
+    return [
+        table.item(row, 0).text() for row in range(table.rowCount()) if not table.isRowHidden(row)
+    ]
+
+
+def test_ctrl_f_toggles_the_search_bar(filtered_window):
+    window = filtered_window
+    assert window.search_row.isHidden()
+    QTest.keyClick(window, Qt.Key_F, Qt.ControlModifier)
+    assert not window.search_row.isHidden()
+    assert window.search_input.hasFocus()
+
+    QTest.keyClicks(window.search_input, "maiden")
+    assert len(visible_artists(window)) == 2
+
+    QTest.keyClick(window.search_input, Qt.Key_F, Qt.ControlModifier)
+    assert window.search_row.isHidden()
+    assert window.search_input.text() == ""
+    assert len(visible_artists(window)) == 4
+
+
+def test_search_matches_artist_song_or_album_once(filtered_window):
+    window = filtered_window
+    window.open_search()
+
+    window.search_input.setText("IRON")
+    # Matches artist, then title and album of the same row, which is listed once.
+    assert visible_artists(window) == ["Iron Maiden", "Maiden Voyage"]
+    assert window.search_count.text() == "2 of 4"
+
+    window.search_input.setText("justice")
+    assert visible_artists(window) == ["Metallica"]
+    window.search_input.setText("angel of")
+    assert visible_artists(window) == ["Slayer"]
+    window.search_input.setText("1984")
+    assert visible_artists(window) == []
+
+    window.search_input.clear()
+    assert len(visible_artists(window)) == 4
+    assert window.search_count.text() == ""
+
+
+def test_hidden_rows_are_left_out_of_selection_and_playback(filtered_window, monkeypatch):
+    from tag_gui.ui.table_fill import selected_tracks
+
+    window = filtered_window
+    monkeypatch.setattr(window.player, "play", lambda: None)
+    window.open_search()
+    window.search_input.setText("maiden")
+    table = window.current_table()
+    table.selectAll()
+    assert len(selected_tracks(table)) == 2
+
+    visible = [row for row in range(table.rowCount()) if not table.isRowHidden(row)]
+    window.play_next()
+    assert window.current_track_index == visible[0]
+    window.play_next()
+    assert window.current_track_index == visible[1]
+    window.play_next()
+    assert window.current_track_index == visible[0]
+    window.play_previous()
+    assert window.current_track_index == visible[1]
+
+
+def test_filter_survives_sorting_and_tab_switches(filtered_window):
+    window = filtered_window
+    window.open_search()
+    window.search_input.setText("maiden")
+    table = window.current_table()
+    table.sort_by_column(0)
+    assert sorted(visible_artists(window)) == ["Iron Maiden", "Maiden Voyage"]
+
+    window.add_playlist()
+    assert window.search_count.text() == "0 of 0"
+    window.tabs.setCurrentIndex(0)
+    assert sorted(visible_artists(window)) == ["Iron Maiden", "Maiden Voyage"]

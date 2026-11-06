@@ -16,13 +16,16 @@ from .file_actions import FileActionsMixin
 from .playback import PlaybackMixin
 from .playlist_actions import PlaylistActionsMixin
 from .progress import progress_reporter
+from .search import SearchMixin
 from .styles import ROW_MARGIN
 from .table import PlaylistTable
 from .table_fill import fill_table, refresh_rows
 from .tag_actions import TagActionsMixin
 
 
-class MainWindow(PlaylistActionsMixin, FileActionsMixin, TagActionsMixin, PlaybackMixin):
+class MainWindow(
+    PlaylistActionsMixin, FileActionsMixin, TagActionsMixin, PlaybackMixin, SearchMixin
+):
     def __init__(self, splash=None):
         QMainWindow.__init__(self)
         self.setWindowTitle(APP_TITLE)
@@ -73,6 +76,7 @@ class MainWindow(PlaylistActionsMixin, FileActionsMixin, TagActionsMixin, Playba
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self.progress_top)
         layout.addLayout(self._build_tags_row())
+        layout.addWidget(self._build_search_row())
         layout.addLayout(tabs_row)
         layout.addLayout(controls_row)
         layout.addWidget(self.progress_bottom)
@@ -114,6 +118,7 @@ class MainWindow(PlaylistActionsMixin, FileActionsMixin, TagActionsMixin, Playba
         table.customContextMenuRequested.connect(self.on_table_context_menu)
         table.itemDoubleClicked.connect(self.on_item_double_clicked)
         table.itemChanged.connect(self.on_item_changed)
+        table.filter_applied.connect(self.update_search_count)
         return table
 
     # ------------------------------------------------------------------ table

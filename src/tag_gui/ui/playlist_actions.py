@@ -119,6 +119,7 @@ class PlaylistActionsMixin(WindowContext):
 
     def on_tab_changed(self, _index):
         self.current_track_index = -1
+        self.apply_search_to_current()
 
     def on_tab_moved(self, from_index: int, to_index: int):
         self.store.move(from_index, to_index)
