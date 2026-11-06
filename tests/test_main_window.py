@@ -353,3 +353,141 @@ def test_filter_survives_sorting_and_tab_switches(filtered_window):
     assert window.search_count.text() == "0 of 0"
     window.tabs.setCurrentIndex(0)
     assert sorted(visible_artists(window)) == ["Iron Maiden", "Maiden Voyage"]
+
+
+def wait_until(condition, timeout_ms=5000):
+    for _ in range(timeout_ms // 20):
+        if condition():
+            return True
+        QTest.qWait(20)
+    return condition()
+
+
+def year_tagged_songs(tmp_path):
+    from tag_gui.core.tags import set_standard_tags
+
+    songs = []
+    for name, year, number in (("c", "2001", "1"), ("a", "1990", "2"), ("b", "1990", "1")):
+        song = write_flac(tmp_path / f"{name}.flac")
+        set_standard_tags(song, {"album": f"Album {year}", "date": year, "tracknumber": number})
+        songs.append(str(song))
+    return songs
+
+
+def test_sort_dropdown_reorders_only_the_current_playlist(window, tmp_path, monkeypatch):
+    monkeypatch.setattr(MainWindow, "scan_for_audio_files", lambda self, paths: list(paths))
+    songs = year_tagged_songs(tmp_path)
+    window.add_tracks_to_current_playlist(songs)
+    window.add_playlist()
+    window.add_tracks_to_current_playlist(list(songs))
+    window.tabs.setCurrentIndex(0)
+    table = window.current_table()
+    table.sort_by_column(0)
+
+    combo = window.sort_combo
+    combo.activated.emit(combo.findData("oldest"))
+    assert combo.currentIndex() == -1
+    assert wait_until(lambda: not window.is_sorting())
+
+    expected = [songs[2], songs[1], songs[0]]
+    assert window.current_playlist().tracks == expected
+    assert [table.item(row, 0).data(Qt.UserRole) for row in range(3)] == expected
+    assert window.playlists[1].tracks == songs
+    assert combo.isEnabled()
+    assert window.sort_status.text().endswith("Sorting completed")
+    assert window.sort_note.isVisibleTo(window)
+    assert not window.sort_spinner.is_spinning()
+
+    window._sort_done_timer.setInterval(10)
+    window._sort_done_fade.setDuration(10)
+    window.show_sort_done()
+    assert wait_until(lambda: window.sort_note.isHidden(), 2000)
+
+    combo.activated.emit(combo.findData("path"))
+    assert window.current_playlist().tracks == sorted(songs)
+
+
+def test_year_sort_reads_track_numbers_off_the_ui_thread(window, tmp_path, monkeypatch):
+    import threading
+
+    from tag_gui.ui import sorting
+
+    monkeypatch.setattr(MainWindow, "scan_for_audio_files", lambda self, paths: list(paths))
+    songs = year_tagged_songs(tmp_path)
+    window.add_tracks_to_current_playlist(songs)
+    for track in songs:
+        window.metadata.get(track, []).position = None
+    release = threading.Event()
+    reader_threads = []
+    real_read = sorting.read_track_position
+
+    def slow_read(path):
+        reader_threads.append(threading.current_thread())
+        release.wait(5)
+        return real_read(path)
+
+    monkeypatch.setattr(sorting, "read_track_position", slow_read)
+    window.sort_current_playlist("newest")
+
+    # The UI keeps running while the worker is blocked on a file read.
+    assert wait_until(lambda: window.sort_spinner.is_spinning(), 2000)
+    assert not window.sort_combo.isEnabled()
+    window.add_playlist()
+    window.tabs.setCurrentIndex(0)
+    release.set()
+    assert wait_until(lambda: not window.is_sorting())
+
+    assert threading.main_thread() not in reader_threads
+    assert window.playlists[0].tracks == [songs[0], songs[2], songs[1]]
+    assert window.metadata.cached_position(songs[1]) == (0, 2)
+
+
+def test_closing_the_window_stops_a_running_sort(window, tmp_path, monkeypatch):
+    import threading
+
+    from tag_gui.ui import sorting
+
+    monkeypatch.setattr(MainWindow, "scan_for_audio_files", lambda self, paths: list(paths))
+    songs = year_tagged_songs(tmp_path)
+    window.add_tracks_to_current_playlist(songs)
+    for track in songs:
+        window.metadata.get(track, []).position = None
+    started = threading.Event()
+
+    def slow_read(path):
+        started.set()
+        QTest.qWait(50)
+        return (0, 0)
+
+    monkeypatch.setattr(sorting, "read_track_position", slow_read)
+    window.sort_current_playlist("oldest")
+    assert started.wait(2)
+    window.close()
+    assert not window.is_sorting()
+    assert window.playlists[0].tracks == songs
+
+
+def test_album_shading_is_painted_per_album_run(qapp):
+    from PySide6.QtWidgets import QTableWidgetItem
+
+    from tag_gui.constants import ALBUM_COLUMN
+    from tag_gui.ui.table import PlaylistTable
+
+    table = PlaylistTable(None, None, None, None)
+    table.setColumnCount(len(DEFAULT_COLUMNS))
+    table.setRowCount(3)
+    for row, album in enumerate(("A", "A", "B")):
+        table.setItem(row, ALBUM_COLUMN, QTableWidgetItem(album))
+        table.setItem(row, 0, QTableWidgetItem(""))
+    table.resize(600, 200)
+    table.apply_album_colors()
+    image = table.viewport().grab().toImage()
+
+    def color(row):
+        rect = table.visualRect(table.model().index(row, 0))
+        return image.pixelColor(rect.left() + 3, rect.center().y()).name()
+
+    assert color(0) == color(1)
+    assert color(0) != color(2)
+    table.reorder([])  # nothing known: rows keep their order
+    assert [table.item(row, ALBUM_COLUMN).text() for row in range(3)] == ["A", "A", "B"]

@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
 )
 
-from ..constants import ALBUM_COLUMN, AUDIO_EXTENSIONS, SEARCH_COLUMNS
+from ..constants import ALBUM_COLUMN, AUDIO_EXTENSIONS, PATH_COLUMN, SEARCH_COLUMNS
 from .styles import ALBUM_TINT_DARK, ALBUM_TINT_LIGHT, SELECTION_STYLE
 
 # Rows that auto-size against every entry are too slow for large playlists.
@@ -49,6 +49,13 @@ class CenteredCheckDelegate(QStyledItemDelegate):
         )
         rect.moveCenter(option.rect.center())
         return rect
+
+    def initStyleOption(self, option, index):
+        super().initStyleOption(option, index)
+        view = self.parent()
+        brush = view.row_background(index.row()) if isinstance(view, PlaylistTable) else None
+        if brush is not None:
+            option.backgroundBrush = brush
 
     def paint(self, painter, option, index):
         if not index.flags() & Qt.ItemIsUserCheckable:
@@ -118,6 +125,8 @@ class PlaylistTable(QTableWidget):
         # columns are joined by newlines, which a single-line search term can never span.
         self._search_texts: Optional[List[str]] = None
         self.visible_rows = 0
+        self._row_shades: List[int] = []
+        self._shade_brushes = (QBrush(), QBrush())
 
     def sort_by_column(self, column: int):
         if column == self._sort_column and self._sort_order == Qt.DescendingOrder:
@@ -135,6 +144,38 @@ class PlaylistTable(QTableWidget):
     def reapply_sort(self):
         if self._sort_column >= 0:
             self.sortItems(self._sort_column, self._sort_order)
+
+    def clear_header_sort(self):
+        """Forget the clicked column, so rows show in playlist order again."""
+        self._sort_column = -1
+        self._sort_order = Qt.DescendingOrder
+        self.horizontalHeader().setSortIndicator(-1, Qt.DescendingOrder)
+
+    def reorder(self, tracks: List[str]):
+        """Move rows into the order of ``tracks`` without rebuilding any items.
+
+        Rebuilding takes seconds for big playlists. Instead the target position goes into a
+        temporary column whose integer display data Qt sorts natively, which is near-instant.
+        """
+        position = {track: index for index, track in enumerate(tracks)}
+        unknown = len(tracks)
+        key_column = self.columnCount()
+        self.blockSignals(True)
+        try:
+            self.insertColumn(key_column)
+            for row in range(self.rowCount()):
+                path_item = self.item(row, PATH_COLUMN)
+                track = path_item.data(Qt.UserRole) if path_item else None
+                key = QTableWidgetItem()
+                key.setData(Qt.DisplayRole, position.get(track, unknown + row))
+                self.setItem(row, key_column, key)
+            self.sortItems(key_column, Qt.AscendingOrder)
+            self.removeColumn(key_column)
+        finally:
+            self.blockSignals(False)
+        self.clear_header_sort()
+        self.apply_album_colors()
+        self.refresh_filter()
 
     def set_filter(self, text: str):
         """Show only rows where artist, song or album contains ``text``, ignoring case."""
@@ -180,27 +221,31 @@ class PlaylistTable(QTableWidget):
         self.filter_applied.emit()
 
     def apply_album_colors(self):
-        """Shade consecutive rows of one album alike, flipping shade at every album change."""
+        """Shade consecutive rows of one album alike, flipping shade at every album change.
+
+        Only a shade per row is stored; the delegate paints it. Setting a background on every
+        cell instead takes seconds on big playlists once rows have been moved around.
+        """
         base = self.palette().base().color()
         tint = ALBUM_TINT_LIGHT if base.lightness() > 128 else ALBUM_TINT_DARK
-        brushes = (QBrush(base), QBrush(QColor(*tint)))
+        self._shade_brushes = (QBrush(base), QBrush(QColor(*tint)))
+        shades = []
         shade = 0
         previous = None
-        # Painting backgrounds would otherwise emit itemChanged for every custom tag cell.
-        self.blockSignals(True)
-        try:
-            for row in range(self.rowCount()):
-                album_item = self.item(row, ALBUM_COLUMN)
-                album = album_item.text() if album_item else ""
-                if previous is not None and album != previous:
-                    shade = 1 - shade
-                previous = album
-                for col in range(self.columnCount()):
-                    cell = self.item(row, col)
-                    if cell:
-                        cell.setBackground(brushes[shade])
-        finally:
-            self.blockSignals(False)
+        for row in range(self.rowCount()):
+            album_item = self.item(row, ALBUM_COLUMN)
+            album = album_item.text() if album_item else ""
+            if previous is not None and album != previous:
+                shade = 1 - shade
+            previous = album
+            shades.append(shade)
+        self._row_shades = shades
+        self.viewport().update()
+
+    def row_background(self, row: int) -> Optional[QBrush]:
+        if 0 <= row < len(self._row_shades):
+            return self._shade_brushes[self._row_shades[row]]
+        return None
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Delete and not event.modifiers():

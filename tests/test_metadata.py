@@ -12,7 +12,7 @@ def reads(monkeypatch):
     """Count disk reads so caching can be observed without touching real audio files."""
     counts = {"fields": 0, "tags": 0}
 
-    def fake_fields(path):
+    def fake_fields(path, easy=None):
         counts["fields"] += 1
         return ["Kaija", "00:03", path.stem, "1999", "Talvi"]
 
@@ -133,3 +133,45 @@ def test_saving_an_unchanged_cache_writes_nothing(reads, song, tmp_path):
     path = tmp_path / "metadata.json"
     MetadataCache(path).save()
     assert not path.exists()
+
+
+def test_track_positions_are_read_with_the_fields_and_persisted(reads, song, tmp_path, monkeypatch):
+    monkeypatch.setattr(metadata_module, "position_from_tags", lambda easy: (2, 7))
+    fallback = []
+    monkeypatch.setattr(metadata_module, "read_track_position", lambda path: fallback.append(path))
+    cache = MetadataCache(tmp_path / "metadata.json")
+    cache.get(str(song), [])
+    assert cache.cached_position(str(song)) == (2, 7)
+    assert cache.track_position(str(song)) == (2, 7)
+    cache.save()
+
+    reloaded = MetadataCache(tmp_path / "metadata.json")
+    reloaded.load()
+    assert reloaded.cached_position(str(song)) == (2, 7)
+    assert fallback == []
+
+
+def test_entries_cached_before_positions_read_them_once(reads, song, monkeypatch):
+    calls = []
+
+    def fake_position(path):
+        calls.append(path)
+        return 1, 3
+
+    monkeypatch.setattr(metadata_module, "read_track_position", fake_position)
+    cache = MetadataCache()
+    cache.get(str(song), []).position = None
+    assert cache.cached_position(str(song)) is None
+    assert cache.track_position(str(song)) == (1, 3)
+    assert cache.track_position(str(song)) == (1, 3)
+    assert len(calls) == 1
+
+
+def test_track_position_parses_numbers_like_3_of_12(tmp_path):
+    from conftest import write_flac
+    from tag_gui.core.tags import read_track_position, set_standard_tags
+
+    song = write_flac(tmp_path / "numbered.flac")
+    assert read_track_position(song) == (0, 0)
+    set_standard_tags(song, {"tracknumber": "3/12", "discnumber": "2"})
+    assert read_track_position(song) == (2, 3)

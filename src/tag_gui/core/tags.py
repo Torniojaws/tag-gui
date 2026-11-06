@@ -1,6 +1,6 @@
 import unicodedata
 from pathlib import Path
-from typing import Dict, Iterable, List
+from typing import Dict, Iterable, List, Tuple
 
 from mutagen import File as MutagenFile
 from mutagen.id3 import ID3, TXXX
@@ -63,6 +63,30 @@ def get_duration(path: Path) -> str:
     if audio is None or not getattr(audio, "info", None):
         return "00:00"
     return seconds_to_mmss(getattr(audio.info, "length", 0))
+
+
+def _leading_number(value: str) -> int:
+    """``"3/12"`` -> 3; anything without a leading number -> 0, meaning not set."""
+    digits = ""
+    for char in value.strip():
+        if not char.isdigit():
+            break
+        digits += char
+    return int(digits) if digits else 0
+
+
+def read_track_position(path: Path) -> Tuple[int, int]:
+    return position_from_tags(load_easy_tags(path))
+
+
+def position_from_tags(easy) -> Tuple[int, int]:
+    """(disc number, track number), each 0 when the tag is missing."""
+    if not easy:
+        return 0, 0
+    return (
+        _leading_number(get_field(easy, "discnumber")),
+        _leading_number(get_field(easy, "tracknumber")),
+    )
 
 
 def get_tag_values_case_insensitive(tags, target: str):

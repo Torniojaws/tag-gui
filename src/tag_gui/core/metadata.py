@@ -1,17 +1,25 @@
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Sequence
+from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
-from .tags import get_duration, get_field, load_easy_tags, read_custom_tag_states
+from .tags import (
+    get_duration,
+    get_field,
+    load_easy_tags,
+    position_from_tags,
+    read_custom_tag_states,
+    read_track_position,
+)
 
 # Bumped whenever the field order changes, so stale entries are discarded.
 CACHE_VERSION = 2
 
 
-def track_fields(path: Path) -> List[str]:
-    """Values in DEFAULT_COLUMNS order."""
-    easy = load_easy_tags(path)
+def track_fields(path: Path, easy=None) -> List[str]:
+    """Values in DEFAULT_COLUMNS order. ``easy`` reuses tags the caller already loaded."""
+    if easy is None:
+        easy = load_easy_tags(path)
     artist = get_field(easy, "artist") if easy else ""
     title = get_field(easy, "title") if easy else ""
     album = get_field(easy, "album") if easy else ""
@@ -32,6 +40,8 @@ class TrackInfo:
     fields: List[str]
     mtime: float
     tag_states: Dict[str, bool] = field(default_factory=dict)
+    # (disc, track); None for entries cached before positions were stored.
+    position: Optional[Tuple[int, int]] = None
 
 
 class MetadataCache:
@@ -48,10 +58,14 @@ class MetadataCache:
         info = self._entries.get(track)
 
         if info is None or info.mtime != mtime:
+            # Opening a file can take ~10 ms on slow disks, so the track position is read
+            # along with the fields instead of separately when a sort needs it.
+            easy = load_easy_tags(path)
             info = TrackInfo(
-                fields=track_fields(path),
+                fields=track_fields(path, easy),
                 mtime=mtime,
                 tag_states=read_custom_tag_states(path, tag_names),
+                position=position_from_tags(easy),
             )
             self._entries[track] = info
             self._dirty = True
@@ -62,6 +76,24 @@ class MetadataCache:
             info.tag_states.update(read_custom_tag_states(path, missing))
             self._dirty = True
         return info
+
+    def track_position(self, track: str) -> Tuple[int, int]:
+        info = self.get(track, ())
+        if info.position is None:
+            info.position = read_track_position(Path(track))
+            self._dirty = True
+        return info.position
+
+    def cached_position(self, track: str) -> Optional[Tuple[int, int]]:
+        info = self._entries.get(track)
+        return info.position if info else None
+
+    def remember_position(self, track: str, position: Tuple[int, int]) -> None:
+        """Store a position read elsewhere, e.g. on a background thread."""
+        info = self._entries.get(track)
+        if info is not None and info.position != position:
+            info.position = position
+            self._dirty = True
 
     def update_tag_state(self, track: str, tag: str, checked: bool) -> None:
         """Called after a successful write so the changed file is not re-read."""
@@ -91,6 +123,7 @@ class MetadataCache:
                     fields=[str(v) for v in entry["fields"]],
                     mtime=float(entry["mtime"]),
                     tag_states={str(k): bool(v) for k, v in entry.get("tags", {}).items()},
+                    position=_position(entry.get("position")),
                 )
             except (KeyError, TypeError, ValueError):
                 continue
@@ -109,11 +142,24 @@ class MetadataCache:
         data = {
             "version": CACHE_VERSION,
             "tracks": {
-                track: {"mtime": info.mtime, "fields": info.fields, "tags": info.tag_states}
-                for track, info in self._entries.items()
+                track: _entry(info) for track, info in self._entries.items()
             },
         }
         tmp = self._path.with_name(self._path.name + ".tmp")
         tmp.write_text(json.dumps(data), encoding="utf-8")
         tmp.replace(self._path)
         self._dirty = False
+
+
+def _entry(info: TrackInfo) -> dict:
+    entry = {"mtime": info.mtime, "fields": info.fields, "tags": info.tag_states}
+    if info.position is not None:
+        entry["position"] = list(info.position)
+    return entry
+
+
+def _position(value) -> Optional[Tuple[int, int]]:
+    if value is None:
+        return None
+    disc, track = value
+    return int(disc), int(track)

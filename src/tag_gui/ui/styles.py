@@ -62,5 +62,12 @@ MUTE_BUTTON_SIZE = 28
 MUTE_ICON_SIZE = 18
 MUTE_ICON_COLOR = "#b04a45"
 
+# The "Sorting completed" note stays this long, then fades out.
+SORT_DONE_COLOR = "#2e9d47"
+SORT_DONE_VISIBLE_MS = 5000
+SORT_DONE_FADE_MS = 800
+SPINNER_SIZE = 16
+SPINNER_INTERVAL_MS = 60
+
 # Duration only ever shows mm:ss, so it does not need content-based sizing.
 DURATION_COLUMN_PADDING = 24

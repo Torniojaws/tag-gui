@@ -17,6 +17,7 @@ from .playback import PlaybackMixin
 from .playlist_actions import PlaylistActionsMixin
 from .progress import progress_reporter
 from .search import SearchMixin
+from .sorting import SortMixin
 from .styles import ROW_MARGIN
 from .table import PlaylistTable
 from .table_fill import fill_table, refresh_rows
@@ -24,7 +25,12 @@ from .tag_actions import TagActionsMixin
 
 
 class MainWindow(
-    PlaylistActionsMixin, FileActionsMixin, TagActionsMixin, PlaybackMixin, SearchMixin
+    PlaylistActionsMixin,
+    FileActionsMixin,
+    TagActionsMixin,
+    PlaybackMixin,
+    SearchMixin,
+    SortMixin,
 ):
     def __init__(self, splash=None):
         QMainWindow.__init__(self)
@@ -56,6 +62,7 @@ class MainWindow(
 
         left = QHBoxLayout()
         left.addWidget(self.volume, 0, Qt.AlignVCenter)
+        left.addWidget(self._build_sort_controls(), 0, Qt.AlignVCenter)
         left.addStretch(1)
 
         right = QHBoxLayout()
@@ -159,6 +166,7 @@ class MainWindow(
         self.metadata.save(keep=self.store.all_tracks())
 
     def closeEvent(self, event):
+        self.cancel_sorting()
         self.save_custom_tags()
         self.save_state()
         self.metadata.save()
