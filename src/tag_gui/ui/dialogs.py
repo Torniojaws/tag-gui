@@ -1,3 +1,4 @@
+from dataclasses import replace
 from typing import Dict, List, Sequence
 
 from PySide6.QtWidgets import (
@@ -96,6 +97,7 @@ class SettingsDialog(QDialog):
     def __init__(self, settings: Settings, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Settings")
+        self._original = settings
 
         self.skip_input = SkipSecondsInput(settings.skip_seconds)
         self.timebar_top = QCheckBox("Top")
@@ -131,7 +133,9 @@ class SettingsDialog(QDialog):
         self.timebar_bottom.setEnabled(self.timebar_top.isChecked())
 
     def settings(self) -> Settings:
-        return Settings(
+        # Fields edited elsewhere, like shuffle, pass through unchanged.
+        return replace(
+            self._original,
             skip_seconds=self.skip_input.value(),
             timebar_top=self.timebar_top.isChecked(),
             timebar_bottom=self.timebar_bottom.isChecked(),

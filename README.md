@@ -122,6 +122,7 @@ workflow run as artifacts.
 - Playlist columns: Artist, Duration, Song, Year, Album
 - Standard tags are edited via right-click -> Edit tags, which writes only the fields you changed, across every selected row (Duration is read-only)
 - Double-click row to play, plus Previous/Play/Pause/Stop/Next controls
+- Shuffle checkbox next to the Next button (remembered between sessions): Next and the end of a song pick a random visible track that shares no artist, album or song with the last 10 played, preferring tracks not yet heard this round. Songs are matched fuzzily, so `Song (Cover)`, `Song - Live 2018` and `Song Live at Wembley` count as `Song`. If everything clashes (e.g. a single-artist playlist) it relaxes the rule instead of stopping. Previous steps back through the tracks that actually played
 - Clickable seek/progress bar, shown at the top, bottom or both (Settings...)
 - While a song plays, `Left`/`Right` skip back/forward by a configurable step (1-60 s, default 5); skipping stops at the start of the song, and skipping past the end starts the next song, which a held key does not keep scrubbing
 - Custom checkbox-tag columns via comma-separated textbox (persisted in `custom_tags.txt` under app data)

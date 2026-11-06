@@ -102,6 +102,7 @@ class MainWindow(
     def apply_settings(self):
         self.progress_top.setVisible(self.settings.timebar_top)
         self.progress_bottom.setVisible(self.settings.timebar_bottom)
+        self.transport.set_shuffle(self.settings.shuffle)
 
     # ------------------------------------------------------------- accessors
 

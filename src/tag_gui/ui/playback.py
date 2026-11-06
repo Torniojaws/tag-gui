@@ -1,7 +1,7 @@
 """The media player, its transport/volume/seek widgets and the playback commands."""
 
 from pathlib import Path
-from typing import Tuple
+from typing import List, Optional, Set, Tuple
 
 from PySide6.QtCore import QEvent, QUrl, Qt
 from PySide6.QtMultimedia import QAudio, QAudioOutput, QMediaDevices, QMediaPlayer
@@ -13,7 +13,9 @@ from PySide6.QtWidgets import (
     QTextEdit,
 )
 
-from ..constants import APP_TITLE, ARTIST_COLUMN, PATH_COLUMN, SONG_COLUMN
+from ..constants import ALBUM_COLUMN, APP_TITLE, ARTIST_COLUMN, PATH_COLUMN, SONG_COLUMN
+from ..core.settings import save_settings
+from ..core.shuffle import TrackKey, pick_next
 from ..core.utils import seconds_to_mmss
 from .sliders import SeekSlider
 from .styles import PAUSE_GLYPH, PLAY_GLYPH, PROGRESS_HEIGHT, PROGRESS_STYLE
@@ -24,6 +26,8 @@ from .window_base import WindowContext
 
 # Left/Right keep moving the text cursor while one of these has focus.
 TEXT_INPUTS = (QLineEdit, QAbstractSpinBox, QTextEdit, QPlainTextEdit)
+# How many played tracks Previous can step back through.
+HISTORY_LIMIT = 200
 
 
 class PlaybackMixin(WindowContext):
@@ -36,6 +40,10 @@ class PlaybackMixin(WindowContext):
         self.player.mediaStatusChanged.connect(self.on_media_status_changed)
         self.player.playbackStateChanged.connect(self.on_playback_state_changed)
         self._skip_blocked = False
+        # Tracks in the order they started playing, newest last.
+        self._history: List[str] = []
+        # Tracks played since the current shuffle round began; cleared when all have played.
+        self._shuffle_played: Set[str] = set()
         # Application-wide, so the arrows skip before the table or tab bar can claim them.
         QApplication.instance().installEventFilter(self)
 
@@ -45,6 +53,7 @@ class PlaybackMixin(WindowContext):
         self.transport.play_pause_clicked.connect(self.toggle_play_pause)
         self.transport.stop_clicked.connect(self.player.stop)
         self.transport.next_clicked.connect(self.play_next)
+        self.transport.shuffle_toggled.connect(self.on_shuffle_toggled)
 
         self.volume = VolumeControls()
         self.volume.volume_changed.connect(self.on_volume_changed)
@@ -104,7 +113,7 @@ class PlaybackMixin(WindowContext):
     def on_item_double_clicked(self, item):
         self.play_row(item.row())
 
-    def play_row(self, row: int):
+    def play_row(self, row: int, remember: bool = True):
         table = self.current_table()
         if row < 0 or row >= table.rowCount():
             return
@@ -115,6 +124,10 @@ class PlaybackMixin(WindowContext):
         self.player.setSource(QUrl.fromLocalFile(file_path))
         self.player.play()
         table.selectRow(row)
+        if remember:
+            self._history.append(file_path)
+            del self._history[:-HISTORY_LIMIT]
+        self._shuffle_played.add(file_path)
 
     def toggle_play_pause(self):
         state = self.player.playbackState()
@@ -132,10 +145,58 @@ class PlaybackMixin(WindowContext):
             self.play_row(selected)
 
     def play_next(self):
+        if self.settings.shuffle and self._play_shuffled():
+            return
         self._play_step(1)
 
     def play_previous(self):
+        if self.settings.shuffle and self._play_from_history():
+            return
         self._play_step(-1)
+
+    def on_shuffle_toggled(self, enabled: bool):
+        self.settings.shuffle = enabled
+        self._shuffle_played.clear()
+        save_settings(self.settings_file, self.settings)
+
+    def _visible_tracks(self) -> List[str]:
+        table = self.current_table()
+        tracks = []
+        for row in range(table.rowCount()):
+            if not table.isRowHidden(row):
+                track = track_of(table.item(row, PATH_COLUMN))
+                if track:
+                    tracks.append(track)
+        return tracks
+
+    def shuffle_key(self, track: str) -> TrackKey:
+        fields = self.metadata.get(track, self.custom_tags).fields
+        return TrackKey.of(fields[ARTIST_COLUMN], fields[ALBUM_COLUMN], fields[SONG_COLUMN])
+
+    def _play_shuffled(self) -> bool:
+        candidates = self._visible_tracks()
+        if not candidates:
+            return False
+        if all(track in self._shuffle_played for track in candidates):
+            self._shuffle_played.clear()
+        choice = pick_next(candidates, self.shuffle_key, self._history, self._shuffle_played)
+        return self._play_track(choice)
+
+    def _play_from_history(self) -> bool:
+        """Shuffle has no fixed order, so Previous steps back through what actually played."""
+        while len(self._history) >= 2:
+            self._history.pop()
+            if self._play_track(self._history[-1], remember=False):
+                return True
+        return False
+
+    def _play_track(self, track: Optional[str], remember: bool = True) -> bool:
+        table = self.current_table()
+        row = row_for_path(table, track) if track else -1
+        if row < 0 or table.isRowHidden(row):
+            return False
+        self.play_row(row, remember)
+        return True
 
     def _play_step(self, direction: int):
         """Play the next/previous row that the filter leaves visible, wrapping around."""

@@ -12,6 +12,7 @@ class Settings:
     skip_seconds: int = SKIP_SECONDS_DEFAULT
     timebar_top: bool = False
     timebar_bottom: bool = True
+    shuffle: bool = False
 
 
 def parse_skip_seconds(text: str, previous: int) -> int:
@@ -38,6 +39,8 @@ def load_settings(path: Path) -> Settings:
     top, bottom = data.get("timebar_top"), data.get("timebar_bottom")
     if isinstance(top, bool) and isinstance(bottom, bool) and (top or bottom):
         settings.timebar_top, settings.timebar_bottom = top, bottom
+    if isinstance(data.get("shuffle"), bool):
+        settings.shuffle = data["shuffle"]
     return settings
 
 

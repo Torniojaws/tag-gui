@@ -1,5 +1,5 @@
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import QHBoxLayout, QPushButton, QWidget
+from PySide6.QtWidgets import QCheckBox, QHBoxLayout, QPushButton, QWidget
 
 from .sizing import transport_button_size
 from .styles import (
@@ -17,12 +17,13 @@ GLYPH_SCALE = 0.4
 
 
 class TransportBar(QWidget):
-    """Square previous/play/stop/next buttons."""
+    """Square previous/play/stop/next buttons and the shuffle toggle."""
 
     previous_clicked = Signal()
     play_pause_clicked = Signal()
     stop_clicked = Signal()
     next_clicked = Signal()
+    shuffle_toggled = Signal(bool)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -51,6 +52,20 @@ class TransportBar(QWidget):
 
         self.play_btn.setStyleSheet(PLAY_BUTTON_STYLE)
         self.stop_btn.setStyleSheet(STOP_BUTTON_STYLE)
+
+        self.shuffle_box = QCheckBox("Shuffle")
+        self.shuffle_box.setToolTip(
+            "Play in random order, avoiding the artists, albums and songs of the last 10 tracks"
+        )
+        self.shuffle_box.toggled.connect(self.shuffle_toggled.emit)
+        layout.addSpacing(4)
+        layout.addWidget(self.shuffle_box, 0, Qt.AlignVCenter)
+
+    def set_shuffle(self, enabled: bool):
+        """Reflect a loaded setting without emitting shuffle_toggled."""
+        self.shuffle_box.blockSignals(True)
+        self.shuffle_box.setChecked(enabled)
+        self.shuffle_box.blockSignals(False)
 
     def set_playing(self, playing: bool):
         self.play_btn.setText(PAUSE_BUTTON_GLYPH if playing else PLAY_BUTTON_GLYPH)

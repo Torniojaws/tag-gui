@@ -491,3 +491,48 @@ def test_album_shading_is_painted_per_album_run(qapp):
     assert color(0) != color(2)
     table.reorder([])  # nothing known: rows keep their order
     assert [table.item(row, ALBUM_COLUMN).text() for row in range(3)] == ["A", "A", "B"]
+
+
+def test_shuffle_checkbox_sits_right_of_next_and_is_remembered(window):
+    from tag_gui.core.settings import load_settings
+
+    transport = window.transport
+    layout = transport.layout()
+    widgets = [layout.itemAt(i).widget() for i in range(layout.count())]
+    widgets = [w for w in widgets if w is not None]
+    assert widgets.index(transport.shuffle_box) == widgets.index(transport.next_btn) + 1
+
+    transport.shuffle_box.setChecked(True)
+    assert window.settings.shuffle
+    assert load_settings(window.settings_file).shuffle
+
+    # Saving the Settings dialog must not switch shuffle back off.
+    assert SettingsDialog(window.settings).settings().shuffle
+
+
+def test_shuffle_avoids_recent_artists_and_previous_walks_back(window, tmp_path, monkeypatch):
+    monkeypatch.setattr(MainWindow, "scan_for_audio_files", lambda self, paths: list(paths))
+    monkeypatch.setattr(window.player, "play", lambda: None)
+    rows = [("Metallica", f"Song {i}", "Black", "1991") for i in range(4)]
+    rows += [("Slayer", "Angel of Death", "Reign", "1986"), ("Bathory", "Odens Ride", "Blood", "1988")]
+    songs = tagged_songs(tmp_path, rows)
+    window.add_tracks_to_current_playlist(songs)
+    window.transport.shuffle_box.setChecked(True)
+    table = window.current_table()
+
+    def playing():
+        return table.item(window.current_track_index, 0).data(Qt.UserRole)
+
+    window.play_row(0)
+    played = [playing()]
+    for _ in range(2):
+        window.play_next()
+        played.append(playing())
+    artists = [window.metadata.get(t, []).fields[0] for t in played]
+    # Two non-Metallica tracks exist, so the first three picks never repeat an artist.
+    assert len(set(artists)) == 3
+
+    window.play_previous()
+    assert playing() == played[1]
+    window.play_previous()
+    assert playing() == played[0]
