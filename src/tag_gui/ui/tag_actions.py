@@ -6,11 +6,13 @@ from typing import List
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QDialog, QHBoxLayout, QLineEdit, QMenu, QMessageBox, QPushButton
 
-from ..constants import DEFAULT_COLUMNS
+from ..constants import DEFAULT_COLUMNS, PATH_COLUMN
+from ..core.file_metadata import read_file_metadata, write_file_metadata
 from ..core.tags import parse_custom_tags, set_custom_tag, set_standard_tags
 from .dialogs import StandardTagsDialog
+from .metadata_dialog import MetadataDialog
 from .styles import ROW_MARGIN
-from .table_fill import TAG_NAME_ROLE, selected_tracks
+from .table_fill import TAG_NAME_ROLE, selected_tracks, track_of
 from .window_base import WindowContext
 
 MAX_REPORTED_FAILURES = 10
@@ -51,8 +53,30 @@ class TagActionsMixin(WindowContext):
         menu = QMenu(self)
         edit_action = menu.addAction("Edit tags...")
         edit_action.setEnabled(bool(selected_tracks(table)))
-        if menu.exec(table.mapToGlobal(pos)) is edit_action:
+        clicked = track_of(table.item(table.rowAt(pos.y()), PATH_COLUMN))
+        metadata_action = menu.addAction("View all metadata...")
+        metadata_action.setEnabled(bool(clicked))
+        chosen = menu.exec(table.mapToGlobal(pos))
+        if chosen is edit_action:
             self.edit_selected_tags()
+        elif chosen is metadata_action:
+            self.view_metadata(clicked)
+
+    def view_metadata(self, track: str):
+        path = Path(track)
+        try:
+            metadata = read_file_metadata(path)
+        except Exception as exc:
+            QMessageBox.warning(self, "Metadata", f"Could not read metadata of:\n{track}\n\n{exc}")
+            return
+
+        def save(changes):
+            write_file_metadata(path, changes)
+            self.metadata.discard(track)
+            for index in range(self.tabs.count()):
+                self.refresh_tracks(self.tabs.widget(index), [track])
+
+        MetadataDialog(path, metadata, save, self).exec()
 
     def edit_selected_tags(self):
         table = self.current_table()

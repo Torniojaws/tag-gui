@@ -141,5 +141,10 @@ def refresh_rows(
             item = table.item(row, col)
             if item:
                 item.setText(value)
+        for offset, tag in enumerate(custom_tags):
+            item = table.item(row, len(DEFAULT_COLUMNS) + offset)
+            checked = Qt.Checked if info.tag_states.get(tag) else Qt.Unchecked
+            if item and item.checkState() != checked:
+                item.setCheckState(checked)
     table.apply_album_colors()
     table.refresh_filter()

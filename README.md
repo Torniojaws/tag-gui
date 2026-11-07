@@ -92,6 +92,7 @@ src/tag_gui/
         playlists.py       PlaylistStore: m3u read/write, state file, naming
         tags.py            mutagen reads/writes, custom tag normalization
         metadata.py        cached track fields and tag states
+        file_metadata.py   every tag of a file in a standard order, and writing edits back
         scanning.py        recursive audio file collection
         settings.py        user settings (skip step, timebar position, shuffle, scrobbling pause, column layout) in settings.json
         copying.py         copying playlist files to another directory
@@ -108,6 +109,7 @@ src/tag_gui/
         desktop_integration.py  Linux menu entry and file icon for the release build
         splash.py          startup window
         dialogs.py         standard tag editor and settings window
+        metadata_dialog.py  View all metadata window
         columns.py         column order and widths shared by all playlists
         table.py           PlaylistTable, check delegate, album shading
         table_fill.py      filling and refreshing rows
@@ -230,6 +232,7 @@ workflow run as artifacts.
 - The Sort playlist dropdown next to the mute button reorders only the current playlist: by full file path, randomly (a new order every time), or by release year oldest/newest first. Year sorting keeps each album together in track (and disc) order, falling back to song title and then path when an album has no track numbers; albums of the same year stay in their playlist order and files without a year go last. Year sorting runs in the background with a spinner, so the window stays usable; track numbers are read along with the other tags and cached, so only files cached by older versions need a one-time read. A green "Sorting completed" note fades out after 5 seconds
 - Playlist columns: Artist, Duration, Song, Year, Album
 - Standard tags are edited via right-click -> Edit tags, which writes only the fields you changed, across every selected row (Duration is read-only)
+- Right-click -> View all metadata... shows everything in the right-clicked file: format details (duration, bitrate, sample rate, channels, size) and every tag with its readable name and raw key (e.g. `TIT2` in MP3, `TITLE` in FLAC). Common fields come first in the usual order (Title, Artist, Album, Album artist, Track number, Disc number, Date, Genre, Composer, Comment), then the rest as stored in the file. Fields with several values (e.g. two artists) get one row per value. Double-click a value to edit it, clear it to remove it, or use Add field... (for MP3 an ID3 frame such as `TCOM`, or `TXXX:Name` for a custom field). Pictures, binary data and multi-line text are shown but cannot be edited there. Saving updates the playlists, including the custom tag checkboxes. `.aac` files cannot hold tags, so their metadata is view-only
 - Double-click row to play, plus Previous/Play/Pause/Stop/Next controls
 - Volume slider with a separate mute button, so unmuting returns to the same volume
 - Shuffle checkbox next to the Next button (remembered between sessions): Next and the end of a song pick a random visible track that shares no artist, album or song with the last 10 played, preferring tracks not yet heard this round. Songs are matched fuzzily, so `Song (Cover)`, `Song - Live 2018` and `Song Live at Wembley` count as `Song`. If everything clashes (e.g. a single-artist playlist) it relaxes the rule instead of stopping. Previous steps back through the tracks that actually played

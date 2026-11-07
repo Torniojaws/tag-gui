@@ -747,3 +747,58 @@ def test_playback_feeds_the_last_fm_play_tracker(window, tmp_path, monkeypatch):
     paused = tracker.listened_ms()
     QTest.qWait(50)
     assert tracker.listened_ms() == paused
+
+def test_view_all_metadata_edits_the_file_and_refreshes_the_rows(window, tmp_path, monkeypatch):
+    from tag_gui.core.tags import set_standard_tags
+    from tag_gui.ui import tag_actions
+    from tag_gui.ui.metadata_dialog import VALUE_COL
+
+    song = write_flac(tmp_path / "song.flac")
+    set_standard_tags(song, {"title": "Old title", "artist": "Kaija"})
+    monkeypatch.setattr(MainWindow, "scan_for_audio_files", lambda self, paths: list(paths))
+    window.tags_input.setText("rock")
+    window.apply_custom_tags()
+    window.add_tracks_to_current_playlist([str(song)])
+    window.add_playlist()
+    window.add_tracks_to_current_playlist([str(song)])
+    tables = [window.tabs.widget(0), window.tabs.widget(1)]
+
+    def edit_and_save(dialog):
+        assert dialog.table.item(0, 0).text() == "Title"
+        dialog.table.item(0, VALUE_COL).setText("New title")
+        row = dialog._add_row("(new field)", "rock", "X", True)
+        assert dialog.table.item(row, VALUE_COL).text() == "X"
+        dialog.accept()
+        return 1
+
+    monkeypatch.setattr(tag_actions.MetadataDialog, "exec", edit_and_save)
+    window.view_metadata(str(song))
+
+    song_column = DEFAULT_COLUMNS.index("Song")
+    rock_column = len(DEFAULT_COLUMNS)
+    for table in tables:
+        assert table.item(0, song_column).text() == "New title"
+        assert table.item(0, rock_column).checkState() == Qt.Checked
+    assert window.metadata.get(str(song), ["rock"]).tag_states == {"rock": True}
+
+
+def test_metadata_dialog_keeps_open_when_saving_fails(qapp, tmp_path, monkeypatch):
+    from tag_gui.core.file_metadata import read_file_metadata
+    from tag_gui.ui import metadata_dialog
+    from tag_gui.ui.metadata_dialog import MetadataDialog, VALUE_COL
+
+    song = write_flac(tmp_path / "song.flac")
+    warnings = []
+    monkeypatch.setattr(
+        metadata_dialog.QMessageBox, "warning", lambda *args: warnings.append(args[2])
+    )
+
+    def failing_save(changes):
+        raise ValueError("disk full")
+
+    dialog = MetadataDialog(song, read_file_metadata(song), failing_save)
+    row = dialog._add_row("(new field)", "MOOD", "calm", True)
+    assert dialog.table.item(row, VALUE_COL).text() == "calm"
+    dialog.accept()
+    assert warnings == ["disk full"]
+    assert dialog.result() != MetadataDialog.Accepted
