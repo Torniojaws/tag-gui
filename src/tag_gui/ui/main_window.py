@@ -113,6 +113,7 @@ class MainWindow(
         self.progress_top.setVisible(self.settings.timebar_top)
         self.progress_bottom.setVisible(self.settings.timebar_bottom)
         self.transport.set_shuffle(self.settings.shuffle)
+        self.lastfm.set_paused(self.settings.scrobbling_paused)
 
     # ------------------------------------------------------------- accessors
 

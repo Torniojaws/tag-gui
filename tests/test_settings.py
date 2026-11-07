@@ -31,7 +31,9 @@ def test_skip_seconds_keeps_digits_and_ignores_out_of_range(text, previous, expe
 
 def test_settings_round_trip(tmp_path):
     path = tmp_path / "settings.json"
-    saved = Settings(skip_seconds=12, timebar_top=True, timebar_bottom=False)
+    saved = Settings(
+        skip_seconds=12, timebar_top=True, timebar_bottom=False, scrobbling_paused=True
+    )
     save_settings(path, saved)
     assert load_settings(path) == saved
 

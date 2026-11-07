@@ -56,6 +56,10 @@ class ListenTracker:
         running = self._clock() - self._resumed_at if self._resumed_at is not None else 0.0
         return int((self._listened + running) * 1000)
 
+    def discard(self):
+        """The current play will never count, however long it keeps playing."""
+        self.counted = True
+
     def take_scrobble(self) -> bool:
         """True exactly once per play, as soon as the play has become a scrobble."""
         if self.counted or self.track is None:

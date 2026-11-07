@@ -136,3 +136,61 @@ def test_settings_dialog_shows_the_connected_account(make_controller, tmp_path):
     box.disconnect_button.click()
     assert "Not connected" in box.status.text()
     assert not box.connect_button.isHidden()
+
+
+def test_paused_scrobbling_skips_plays_until_the_next_track(
+    make_controller, server, tmp_path, monkeypatch
+):
+    (tmp_path / "lastfm.json").write_text(json.dumps({"username": "juha", "session_key": "sk-1"}))
+    from tag_gui.core import scrobbling
+    from tag_gui.core.lastfm import Scrobble
+
+    monkeypatch.setattr(
+        scrobbling,
+        "read_scrobble_tags",
+        lambda path, started_at, duration_s: Scrobble("Kaija", path.stem, started_at),
+    )
+    controller = make_controller()
+    clock = [0.0]
+    controller.tracker._clock = lambda: clock[0]
+
+    def methods():
+        return [c["method"] for c in server.calls]
+
+    # Paused for a whole track: no now playing, no scrobble.
+    controller.set_paused(True)
+    controller.track_started(str(tmp_path / "talvi.flac"))
+    controller.set_duration(100_000)
+    clock[0] = 60
+    controller.tick()
+
+    # Pausing mid-track drops that play too, even once unpaused again.
+    controller.set_paused(False)
+    controller.track_started(str(tmp_path / "kesa.flac"))
+    controller.set_duration(100_000)
+    controller.set_paused(True)
+    controller.set_paused(False)
+    clock[0] = 120
+    controller.tick()
+    QTest.qWait(200)
+    assert "track.scrobble" not in methods()
+    assert methods().count("track.updateNowPlaying") == 1
+
+    # Tracks started after unpausing count again.
+    controller.track_started(str(tmp_path / "syksy.flac"))
+    controller.set_duration(100_000)
+    clock[0] = 180
+    controller.tick()
+    assert wait_until(lambda: "track.scrobble" in methods())
+    QTest.qWait(100)
+    scrobbles = [c for c in server.calls if c["method"] == "track.scrobble"]
+    assert len(scrobbles) == 1 and scrobbles[0]["track[0]"] == "syksy"
+
+
+def test_settings_dialog_pause_checkbox(make_controller):
+    controller = make_controller()
+    dialog = SettingsDialog(Settings(scrobbling_paused=True), lastfm=controller)
+    box = dialog.lastfm_box.pause_box
+    assert box.isChecked()
+    box.setChecked(False)
+    assert dialog.settings().scrobbling_paused is False

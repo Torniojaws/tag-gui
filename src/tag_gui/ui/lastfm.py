@@ -163,6 +163,7 @@ class LastfmController(QObject):
         self._account_file = data_dir / "lastfm.json"
         self.username: Optional[str] = None
         self.tracker = ListenTracker()
+        self.paused = False
         self._worker: Optional[ScrobbleWorker] = None
 
         credentials = credentials if credentials is not None else load_api_credentials()
@@ -244,10 +245,20 @@ class LastfmController(QObject):
 
     # ---------------------------------------------------------- playback hooks
 
+    def set_paused(self, paused: bool):
+        """While paused nothing is sent or tracked; plays heard while paused never count."""
+        if paused and not self.paused:
+            self.tick()
+            self.tracker.discard()
+        self.paused = paused
+
     def track_started(self, path: str):
         self.tick()
         self.tracker.start(path, int(time.time()))
         self.tracker.resume()
+        if self.paused:
+            self.tracker.discard()
+            return
         if self._worker is not None and self.connected:
             self._worker.now_playing(path, 0)
 
@@ -263,7 +274,7 @@ class LastfmController(QObject):
 
     def tick(self):
         """Called as playback advances; queues the play once it counts as a scrobble."""
-        if self._worker is None or not self.connected:
+        if self._worker is None or not self.connected or self.paused:
             return
         if self.tracker.take_scrobble():
             self._worker.scrobble(

@@ -100,12 +100,18 @@ class SkipSecondsInput(QLineEdit):
 class LastfmBox(QGroupBox):
     """Connect/disconnect scrobbling. Login happens on last.fm in the browser."""
 
-    def __init__(self, lastfm=None, parent=None):
+    def __init__(self, lastfm=None, paused: bool = False, parent=None):
         super().__init__("Last.fm scrobbling", parent)
         self._lastfm = lastfm
         self.status = QLabel()
         self.status.setWordWrap(True)
         self.status.setOpenExternalLinks(True)
+        self.pause_box = QCheckBox("Pause scrobbling")
+        self.pause_box.setToolTip(
+            "While checked, tracks are not scrobbled or tracked. Only tracks started after "
+            "unchecking are scrobbled."
+        )
+        self.pause_box.setChecked(paused)
         self.connect_button = QPushButton("Connect to Last.fm...")
         self.disconnect_button = QPushButton("Disconnect")
         self.cancel_button = QPushButton("Cancel")
@@ -122,11 +128,13 @@ class LastfmBox(QGroupBox):
         layout.addWidget(self.status)
         layout.addWidget(self.error)
         layout.addLayout(buttons)
+        layout.addWidget(self.pause_box)
 
         if lastfm is None or not lastfm.available:
             self.status.setText("Not available in this build (it has no Last.fm API key).")
             for button in (self.connect_button, self.disconnect_button, self.cancel_button):
                 button.hide()
+            self.pause_box.hide()
             return
         self.connect_button.clicked.connect(self._connect)
         self.disconnect_button.clicked.connect(lastfm.disconnect_account)
@@ -204,7 +212,7 @@ class SettingsDialog(QDialog):
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
 
-        self.lastfm_box = LastfmBox(lastfm)
+        self.lastfm_box = LastfmBox(lastfm, settings.scrobbling_paused)
 
         layout = QVBoxLayout(self)
         layout.addLayout(form)
@@ -223,4 +231,5 @@ class SettingsDialog(QDialog):
             skip_seconds=self.skip_input.value(),
             timebar_top=self.timebar_top.isChecked(),
             timebar_bottom=self.timebar_bottom.isChecked(),
+            scrobbling_paused=self.lastfm_box.pause_box.isChecked(),
         )

@@ -50,7 +50,7 @@ src/tag_gui/
         tags.py            mutagen reads/writes, custom tag normalization
         metadata.py        cached track fields and tag states
         scanning.py        recursive audio file collection
-        settings.py        user settings (skip step, timebar position, shuffle) in settings.json
+        settings.py        user settings (skip step, timebar position, shuffle, scrobbling pause) in settings.json
         copying.py         copying playlist files to another directory
         sorting.py         playlist orders: by path, random, by release year
         shuffle.py         shuffle picks avoiding recent artists, albums and songs
@@ -167,7 +167,7 @@ workflow run as artifacts.
 - Standard tags are edited via right-click -> Edit tags, which writes only the fields you changed, across every selected row (Duration is read-only)
 - Double-click row to play, plus Previous/Play/Pause/Stop/Next controls
 - Shuffle checkbox next to the Next button (remembered between sessions): Next and the end of a song pick a random visible track that shares no artist, album or song with the last 10 played, preferring tracks not yet heard this round. Songs are matched fuzzily, so `Song (Cover)`, `Song - Live 2018` and `Song Live at Wembley` count as `Song`. If everything clashes (e.g. a single-artist playlist) it relaxes the rule instead of stopping. Previous steps back through the tracks that actually played
-- Last.fm scrobbling: Settings -> Connect to Last.fm opens last.fm in the browser, where you allow Tag GUI; the app never sees your password and keeps only the session key (`lastfm.json` under app data). Each track sends "now playing" and is scrobbled once it has played for half its length or 4 minutes (tracks of 30 s or less never count). Only time actually played counts, so pausing or skipping ahead does not, and files without artist and title tags are not scrobbled. Network calls run in the background; plays that cannot be sent (offline, Last.fm down, logged out) are kept in `scrobble_queue.json` and sent later
+- Last.fm scrobbling: Settings -> Connect to Last.fm opens last.fm in the browser, where you allow Tag GUI; the app never sees your password and keeps only the session key (`lastfm.json` under app data). Each track sends "now playing" and is scrobbled once it has played for half its length or 4 minutes (tracks of 30 s or less never count). Only time actually played counts, so pausing or skipping ahead does not, and files without artist and title tags are not scrobbled. Network calls run in the background; plays that cannot be sent (offline, Last.fm down, logged out) are kept in `scrobble_queue.json` and sent later. The "Pause scrobbling" checkbox in Settings (remembered between sessions) stops scrobbling and "now playing" updates; tracks heard while it is checked are not tracked, so only tracks started after unchecking it are scrobbled
 - Clickable seek/progress bar, shown at the top, bottom or both (Settings...)
 - While a song plays, `Left`/`Right` skip back/forward by a configurable step (1-60 s, default 5); skipping stops at the start of the song, and skipping past the end starts the next song, which a held key does not keep scrubbing
 - Custom checkbox-tag columns via comma-separated textbox (persisted in `custom_tags.txt` under app data)

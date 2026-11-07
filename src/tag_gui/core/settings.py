@@ -13,6 +13,7 @@ class Settings:
     timebar_top: bool = False
     timebar_bottom: bool = True
     shuffle: bool = False
+    scrobbling_paused: bool = False
 
 
 def parse_skip_seconds(text: str, previous: int) -> int:
@@ -41,6 +42,8 @@ def load_settings(path: Path) -> Settings:
         settings.timebar_top, settings.timebar_bottom = top, bottom
     if isinstance(data.get("shuffle"), bool):
         settings.shuffle = data["shuffle"]
+    if isinstance(data.get("scrobbling_paused"), bool):
+        settings.scrobbling_paused = data["scrobbling_paused"]
     return settings
 
 
