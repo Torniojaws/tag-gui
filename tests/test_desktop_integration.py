@@ -13,7 +13,8 @@ def test_install_writes_the_icon_and_menu_entry_once(qapp, tmp_path, monkeypatch
     calls = []
     monkeypatch.setattr(di.shutil, "which", lambda name: "/usr/bin/gio")
     monkeypatch.setattr(di.subprocess, "run", lambda args, **kwargs: calls.append(args))
-    binary = str(tmp_path / "Downloads" / "tag-gui-v1.3.1-linux-x86_64")
+    # Only a string here, so it is a Linux path on every OS the suite runs on.
+    binary = "/home/user/Downloads/tag-gui-v1.3.1-linux-x86_64"
 
     di.install(binary, tmp_path)
 
