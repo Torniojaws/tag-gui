@@ -28,7 +28,7 @@ This is almost entirely AI-generated, so no warranties :D
 4. Optional: to scrobble to Last.fm, open Settings -> Connect to Last.fm... and allow Tag GUI in
    the browser. No API key or other setup is needed with the released builds.
 
-## Run
+## Run from source code
 
 ```bash
 pip install -r requirements.txt
