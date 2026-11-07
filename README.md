@@ -22,9 +22,9 @@ This is almost entirely AI-generated, so no warranties :D
 2. Windows:
    1. Download the file `tag-gui-v<version>.exe` (e.g. `tag-gui-v1.0.0.exe`) and run it
 3. For Debian-like (Linux Mint, Ubuntu, etc):
-   1. Download the file `tag-gui-v<version>` (e.g. `tag-gui-v1.0.0`)
-   2. Give it execute permissions with: `chmod +x tag-gui-v1.0.0`
-   3. And then run it with `./tag-gui-v1.0.0`
+   1. Download the file `tag-gui-v<version>-linux-x86_64` (e.g. `tag-gui-v1.0.0-linux-x86_64`)
+   2. Give it execute permissions with: `chmod +x tag-gui-v1.0.0-linux-x86_64`
+   3. And then run it with `./tag-gui-v1.0.0-linux-x86_64`
 4. Optional: to scrobble to Last.fm, open Settings -> Connect to Last.fm... and allow Tag GUI in
    the browser. No API key or other setup is needed with the released builds.
 
@@ -145,7 +145,10 @@ Pushes to `main` that change the app also run
 [.github/workflows/build.yml](.github/workflows/build.yml); pushes that only change Markdown files,
 `LICENSE` or files under `tests/` skip it. It runs the same test workflow first, then builds the
 executable on Windows and Linux and publishes them as a release tagged with the app version, e.g.
-`v1.0.0` containing `tag-gui-v1.0.0.exe` and `tag-gui-v1.0.0`. The version comes from
+`v1.0.0` containing `tag-gui-v1.0.0.exe` and `tag-gui-v1.0.0-linux-x86_64`. The Linux file names
+the OS and CPU it runs on, the usual convention for downloadable binaries, which also keeps the
+name from ending in a number like `.0`: file managers would take that for a file type extension
+(e.g. `.1` is a man page) instead of recognizing the executable. The version comes from
 `__version__` in `src/tag_gui/__init__.py` (see
 [AGENTS.md](AGENTS.md) for when to bump it). If a release of that version already exists, the
 patch number is increased until it is free (`v1.0.1`, `v1.0.2`, ...) and the build is stamped

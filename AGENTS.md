@@ -15,8 +15,10 @@ and bump it as part of every change that alters app behavior:
 Changes that do not affect the app, such as tests, documentation or build scripts alone, do
 not need a bump. When one task contains several changes, bump once, by the largest step.
 
-GitHub releases are named after this version: `vX.Y.Z` with the files `tag-gui-vX.Y.Z` (Linux)
-and `tag-gui-vX.Y.Z.exe`. If a release of the version already exists, CI publishes the next free
+GitHub releases are named after this version: `vX.Y.Z` with the files
+`tag-gui-vX.Y.Z-linux-x86_64` and `tag-gui-vX.Y.Z.exe`. Keep the `-linux-x86_64` suffix: a Linux
+file name ending in `.Z` is taken for a file type extension (`.1` is a man page), so file managers
+would not run it. If a release of the version already exists, CI publishes the next free
 patch version instead and stamps it into the build; the source file is not changed by CI.
 
 ## Secrets

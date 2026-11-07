@@ -61,7 +61,8 @@ jobs:
             asset: tag-gui-v${{ needs.version.outputs.value }}.exe
           - os: ubuntu-latest
             built: dist/tag-gui
-            asset: tag-gui-v${{ needs.version.outputs.value }}
+            # Not ending in the version: file managers would read e.g. ".1" as a man page.
+            asset: tag-gui-v${{ needs.version.outputs.value }}-linux-x86_64
     runs-on: ${{ matrix.os }}
     defaults:
       run:
