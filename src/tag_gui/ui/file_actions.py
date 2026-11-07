@@ -178,7 +178,11 @@ class FileActionsMixin(WindowContext):
         playlist.tracks = [t for t in playlist.tracks if Path(t) not in removed]
         for track in paths:
             self.metadata.discard(track)
-        self.populate_table(table, playlist)
+        self._updating_table = True
+        try:
+            table.remove_tracks(paths)
+        finally:
+            self._updating_table = False
 
         if playing and Path(playing) in removed:
             self.player.stop()

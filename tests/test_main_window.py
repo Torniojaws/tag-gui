@@ -7,7 +7,7 @@ from PySide6.QtMultimedia import QMediaPlayer
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication
 
-from tag_gui.constants import DEFAULT_COLUMNS
+from tag_gui.constants import DEFAULT_COLUMNS, PATH_COLUMN
 from tag_gui.core.settings import Settings
 from tag_gui.ui import main_window as main_window_module
 from tag_gui.ui.dialogs import SettingsDialog, SkipSecondsInput
@@ -104,6 +104,47 @@ def test_home_and_end_scroll_the_playlist(window, tmp_path, monkeypatch):
     QTest.keyClick(table, Qt.Key_Home)
     assert bar.value() == bar.minimum()
     assert [i.row() for i in table.selectionModel().selectedRows()] == [5]
+
+
+def test_removing_tracks_keeps_the_table_and_scroll_position(window, tmp_path, monkeypatch):
+    songs = [str(write_flac(tmp_path / f"song{i}.flac")) for i in range(60)]
+    monkeypatch.setattr(MainWindow, "scan_for_audio_files", lambda self, paths: list(paths))
+    window.add_tracks_to_current_playlist(songs)
+    window.resize(800, 400)
+    window.show()
+    table = window.current_table()
+    bar = table.verticalScrollBar()
+    bar.setValue(bar.maximum() // 2)
+    scroll = bar.value()
+    kept_item = table.item(0, 0)
+
+    def no_rebuild(*_args):
+        raise AssertionError("removing tracks must not rebuild the table")
+
+    monkeypatch.setattr(MainWindow, "populate_table", no_rebuild)
+    table.selectRow(30)
+    QTest.keyClick(table, Qt.Key_Delete)
+
+    assert table.rowCount() == 59
+    assert songs[30] not in window.current_playlist().tracks
+    assert table.item(0, 0) is kept_item
+    assert bar.value() == scroll
+    paths = [table.item(row, PATH_COLUMN).data(Qt.UserRole) for row in range(59)]
+    assert paths == songs[:30] + songs[31:]
+
+
+def test_removing_a_track_keeps_the_search_filter(filtered_window):
+    window = filtered_window
+    window.open_search()
+    window.search_input.setText("maiden")
+    table = window.current_table()
+    first_visible = next(row for row in range(table.rowCount()) if not table.isRowHidden(row))
+    table.selectRow(first_visible)
+    window.remove_selected_tracks()
+
+    assert table.rowCount() == 3
+    assert len(visible_artists(window)) == 1
+    assert window.search_count.text() == "1 of 3"
 
 
 def test_copy_files_to_dir_copies_the_playlist(window, tmp_path, monkeypatch):

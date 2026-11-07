@@ -177,6 +177,29 @@ class PlaylistTable(QTableWidget):
         self.apply_album_colors()
         self.refresh_filter()
 
+    def remove_tracks(self, tracks: List[str]):
+        """Drop the rows of ``tracks`` in place, keeping the scroll position and other rows."""
+        removed = {Path(track) for track in tracks}
+        rows = []
+        for row in range(self.rowCount()):
+            path_item = self.item(row, PATH_COLUMN)
+            track = path_item.data(Qt.UserRole) if path_item else None
+            if track and Path(track) in removed:
+                rows.append(row)
+        if not rows:
+            return
+        scroll = self.verticalScrollBar().value()
+        self.setUpdatesEnabled(False)
+        try:
+            for row in reversed(rows):
+                self.removeRow(row)
+            self.clearSelection()
+        finally:
+            self.setUpdatesEnabled(True)
+        self.verticalScrollBar().setValue(scroll)
+        self.apply_album_colors()
+        self.refresh_filter()
+
     def set_filter(self, text: str):
         """Show only rows where artist, song or album contains ``text``, ignoring case."""
         term = text.strip().casefold()
