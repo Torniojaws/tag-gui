@@ -106,6 +106,40 @@ def test_home_and_end_scroll_the_playlist(window, tmp_path, monkeypatch):
     assert [i.row() for i in table.selectionModel().selectedRows()] == [5]
 
 
+def test_mac_keys_remove_rows_and_scroll(window, tmp_path, monkeypatch):
+    from tag_gui.ui import table as table_module
+
+    songs = [str(write_flac(tmp_path / f"song{i}.flac")) for i in range(60)]
+    monkeypatch.setattr(MainWindow, "scan_for_audio_files", lambda self, paths: list(paths))
+    window.add_tracks_to_current_playlist(songs)
+    window.resize(800, 400)
+    window.show()
+    table = window.current_table()
+    bar = table.verticalScrollBar()
+
+    # Elsewhere Backspace does nothing to the playlist.
+    table.selectRow(0)
+    QTest.keyClick(table, Qt.Key_Backspace)
+    assert table.rowCount() == 60
+
+    monkeypatch.setattr(table_module, "IS_MAC", True)
+    table.selectRow(0)
+    QTest.keyClick(table, Qt.Key_Backspace)
+    assert table.rowCount() == 59
+    table.selectRow(0)
+    QTest.keyClick(table, Qt.Key_Backspace, Qt.ControlModifier)
+    assert table.rowCount() == 58
+    assert window.current_playlist().tracks == songs[2:]
+
+    # Qt reports Cmd as Control on macOS, and arrows arrive with KeypadModifier.
+    QTest.keyClick(table, Qt.Key_Down, Qt.ControlModifier | Qt.KeypadModifier)
+    assert bar.value() == bar.maximum() > 0
+    QTest.keyClick(table, Qt.Key_Up, Qt.ControlModifier | Qt.KeypadModifier)
+    assert bar.value() == bar.minimum()
+    QTest.keyClick(table, Qt.Key_End, Qt.KeypadModifier)
+    assert bar.value() == bar.maximum()
+
+
 def test_removing_tracks_keeps_the_table_and_scroll_position(window, tmp_path, monkeypatch):
     songs = [str(write_flac(tmp_path / f"song{i}.flac")) for i in range(60)]
     monkeypatch.setattr(MainWindow, "scan_for_audio_files", lambda self, paths: list(paths))

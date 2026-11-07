@@ -4,6 +4,8 @@ from . import __version__ as APP_VERSION
 
 APP_ID = "tag-gui.tag-gui"
 APP_TITLE = "Tag GUI"
+# Application name, Linux .desktop entry id and X11 window class.
+DESKTOP_ID = "tag-gui"
 WINDOW_TITLE = f"{APP_TITLE} {APP_VERSION}"
 
 AUDIO_EXTENSIONS = {".mp3", ".flac", ".fla", ".wma", ".aac"}

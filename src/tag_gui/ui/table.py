@@ -1,3 +1,4 @@
+import sys
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -28,6 +29,7 @@ from .styles import ALBUM_TINT_DARK, ALBUM_TINT_LIGHT, SELECTION_STYLE
 
 # Rows that auto-size against every entry are too slow for large playlists.
 RESIZE_SAMPLE_ROWS = 50
+IS_MAC = sys.platform == "darwin"
 
 
 def is_checked(index) -> bool:
@@ -341,14 +343,23 @@ class PlaylistTable(QTableWidget):
         return None
 
     def keyPressEvent(self, event):
-        if event.key() == Qt.Key_Delete and not event.modifiers():
+        key = event.key()
+        # macOS adds KeypadModifier to arrow and Home/End keys; Qt reports Cmd as Control there.
+        mods = event.modifiers() & ~Qt.KeypadModifier
+        plain = mods == Qt.NoModifier
+        command = IS_MAC and mods == Qt.ControlModifier
+        # The Mac "delete" key sends Backspace; Cmd+Backspace is Finder's "move to trash".
+        if (key == Qt.Key_Delete and plain) or (
+            IS_MAC and key == Qt.Key_Backspace and (plain or command)
+        ):
             self.on_delete_pressed()
             return
-        # Plain Home/End would only jump between columns of the current row.
-        if event.key() == Qt.Key_Home and not event.modifiers():
+        # Plain Home/End would only jump between columns of the current row. Macs without
+        # Home/End keys use Fn+Left/Right (sent as Home/End) or Cmd+Up/Down.
+        if (key == Qt.Key_Home and plain) or (key == Qt.Key_Up and command):
             self.scrollToTop()
             return
-        if event.key() == Qt.Key_End and not event.modifiers():
+        if (key == Qt.Key_End and plain) or (key == Qt.Key_Down and command):
             self.scrollToBottom()
             return
         if event.matches(QKeySequence.Copy):

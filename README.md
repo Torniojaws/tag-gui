@@ -26,10 +26,16 @@ This is almost entirely AI-generated, so no warranties :D
 3. For Debian-like (Linux Mint, Ubuntu, etc):
    1. Download the file `tag-gui-v<version>-linux-x86_64` (e.g. `tag-gui-v1.0.0-linux-x86_64`)
    2. Give it execute permissions with: `chmod +x tag-gui-v1.0.0-linux-x86_64`
-   3. And then run it
+   3. And then run it. On every start it adds (or updates) a "Tag GUI" entry with its icon in the
+      application menu, pointing at the file you ran, and gives the file itself the icon in file
+      managers such as Nemo and Nautilus (Linux executables cannot contain an icon). Launch or pin
+      it from the menu to get the icon in the panel too
    4. If it fails with `Could not load the Qt platform plugin "xcb"`, install the missing library
       with `sudo apt install libxcb-cursor0` and run it again
-4. Optional: to scrobble to Last.fm, open Settings -> Connect to Last.fm... and allow Tag GUI in
+4. macOS: there is no release build, and the app is untested on macOS. It should run from source
+   (see below); shortcuts use `Cmd` where this README says `Ctrl`. WMA playback needs Qt's bundled
+   FFmpeg media backend, because macOS's own media framework cannot play WMA
+5. Optional: to scrobble to Last.fm, open Settings -> Connect to Last.fm... and allow Tag GUI in
    the browser. No API key or other setup is needed with the released builds.
 
 ## Run from source code
@@ -66,6 +72,10 @@ Playlists, settings and caches are stored in `~/.config/tag-gui` on Linux,
 | `lastfm.json` | the Last.fm user name and session key |
 | `scrobble_queue.json` | plays waiting to be sent to Last.fm |
 
+The Linux release build also writes its menu entry to `~/.local/share/applications/tag-gui.desktop`
+and its icon to `~/.local/share/icons/hicolor/256x256/apps/tag-gui.png`. Delete both to remove it
+from the menu.
+
 ## Layout
 
 ```
@@ -95,6 +105,7 @@ src/tag_gui/
         styles.py          colours, glyphs, sizes
         sizing.py          screen-derived widget sizes
         icons.py           note and speaker drawing
+        desktop_integration.py  Linux menu entry and file icon for the release build
         splash.py          startup window
         dialogs.py         standard tag editor and settings window
         columns.py         column order and widths shared by all playlists
@@ -211,11 +222,11 @@ workflow run as artifacts.
 ## Features
 
 - Drag and drop audio files (`.mp3`, `.flac`, `.fla`, `.wma`, `.aac`) or whole folders into playlist tables, or use the Add Files button. WAV files are refused with a warning, because they cannot hold tags
-- `Ctrl+C`/`Ctrl+V` copy and paste one or more selected songs between playlists; files copied in a file manager can be pasted in too
+- `Ctrl+C`/`Ctrl+V` (`Cmd` on macOS) copy and paste one or more selected songs between playlists; files copied in a file manager can be pasted in too
 - Dropped folders are scanned recursively with a cancellable progress dialog; tags are then read in batches so large trees stay responsive
-- Select rows (shift/ctrl click, `Ctrl+A`) and press `Delete` to remove them; removing several asks for confirmation
-- `Home`/`End` scroll the playlist to the top/bottom without changing the selection
-- `Ctrl+F` opens a filter bar above the playlists and `Ctrl+F` (or `Esc`) closes it again; the list narrows as you type to rows whose Artist, Song or Album contains the text (case-insensitive), shows the match count, and clearing or closing the filter brings back the full list. Next/Previous play only the visible rows, and selection-based actions (Delete, copy, Edit tags) ignore hidden rows
+- Select rows (shift/ctrl click, `Ctrl+A`) and press `Delete` to remove them (on macOS also the `delete` key or `Cmd+delete`); removing several asks for confirmation
+- `Home`/`End` scroll the playlist to the top/bottom without changing the selection; on macOS also `Fn+Left`/`Fn+Right` or `Cmd+Up`/`Cmd+Down`
+- `Ctrl+F` (`Cmd+F` on macOS) opens a filter bar above the playlists and `Ctrl+F` (or `Esc`) closes it again; the list narrows as you type to rows whose Artist, Song or Album contains the text (case-insensitive), shows the match count, and clearing or closing the filter brings back the full list. Next/Previous play only the visible rows, and selection-based actions (Delete, copy, Edit tags) ignore hidden rows
 - The Sort playlist dropdown next to the mute button reorders only the current playlist: by full file path, randomly (a new order every time), or by release year oldest/newest first. Year sorting keeps each album together in track (and disc) order, falling back to song title and then path when an album has no track numbers; albums of the same year stay in their playlist order and files without a year go last. Year sorting runs in the background with a spinner, so the window stays usable; track numbers are read along with the other tags and cached, so only files cached by older versions need a one-time read. A green "Sorting completed" note fades out after 5 seconds
 - Playlist columns: Artist, Duration, Song, Year, Album
 - Standard tags are edited via right-click -> Edit tags, which writes only the fields you changed, across every selected row (Duration is read-only)
