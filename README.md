@@ -24,7 +24,7 @@ This is almost entirely AI-generated, so no warranties :D
 3. For Debian-like (Linux Mint, Ubuntu, etc):
    1. Download the file `tag-gui-v<version>-linux-x86_64` (e.g. `tag-gui-v1.0.0-linux-x86_64`)
    2. Give it execute permissions with: `chmod +x tag-gui-v1.0.0-linux-x86_64`
-   3. And then run it with `./tag-gui-v1.0.0-linux-x86_64`
+   3. And then run it
 4. Optional: to scrobble to Last.fm, open Settings -> Connect to Last.fm... and allow Tag GUI in
    the browser. No API key or other setup is needed with the released builds.
 
