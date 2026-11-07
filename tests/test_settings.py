@@ -52,3 +52,23 @@ def test_invalid_settings_values_are_replaced(tmp_path):
         encoding="utf-8",
     )
     assert load_settings(path) == Settings()
+
+
+def test_column_layout_settings_round_trip_and_drop_bad_values(tmp_path):
+    path = tmp_path / "settings.json"
+    saved = Settings(column_order=["Song", "Artist"], column_widths={"Artist": 250, "rock": 40})
+    save_settings(path, saved)
+    assert load_settings(path) == saved
+
+    path.write_text(
+        json.dumps(
+            {
+                "column_order": ["Song", 3, "Song", "Album"],
+                "column_widths": {"Artist": 0, "Song": "wide", "Album": 120, "Year": True},
+            }
+        ),
+        encoding="utf-8",
+    )
+    loaded = load_settings(path)
+    assert loaded.column_order == ["Song", "Album"]
+    assert loaded.column_widths == {"Album": 120}

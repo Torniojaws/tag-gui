@@ -190,6 +190,67 @@ def test_custom_tags_survive_a_restart(window, tmp_path, qapp, monkeypatch):
         reopened.deleteLater()
 
 
+def test_column_order_and_widths_are_shared_and_remembered(window, tmp_path, monkeypatch):
+    songs = [str(write_flac(tmp_path / f"song{i}.flac")) for i in range(3)]
+    monkeypatch.setattr(MainWindow, "scan_for_audio_files", lambda self, paths: list(paths))
+    window.add_tracks_to_current_playlist(songs)
+    window.add_playlist()
+    other = window.current_table()
+    window.tabs.setCurrentIndex(0)
+    first = window.current_table()
+    # Filling tables sizes columns to fit, which must not count as the user's widths.
+    assert window.settings.column_widths == {}
+
+    header = first.horizontalHeader()
+    header.moveSection(header.visualIndex(DEFAULT_COLUMNS.index("Song")), 0)
+    header.resizeSection(DEFAULT_COLUMNS.index("Artist"), 333)
+    expected_order = ["Song", "Artist", "Duration", "Year", "Album"]
+    assert first.column_order() == expected_order
+    assert other.column_order() == expected_order
+    assert other.columnWidth(DEFAULT_COLUMNS.index("Artist")) == 333
+
+    # Data still comes from the logical columns, whatever the visual order.
+    assert first.item(0, PATH_COLUMN).data(Qt.UserRole) == songs[0]
+
+    window.add_playlist()
+    created = window.current_table()
+    assert created.column_order() == expected_order
+    assert created.columnWidth(DEFAULT_COLUMNS.index("Artist")) == 333
+
+    # A new custom tag column goes last, and the layout survives rebuilding the tables.
+    window.tags_input.setText("rock")
+    window.apply_custom_tags()
+    assert first.column_order() == expected_order + ["rock"]
+    assert first.columnWidth(DEFAULT_COLUMNS.index("Artist")) == 333
+
+    window.close()
+    monkeypatch.setattr(main_window_module, "app_data_dir", lambda: tmp_path)
+    reopened = MainWindow()
+    try:
+        for index in range(reopened.tabs.count()):
+            table = reopened.tabs.widget(index)
+            assert table.column_order() == expected_order + ["rock"]
+            assert table.columnWidth(DEFAULT_COLUMNS.index("Artist")) == 333
+    finally:
+        reopened.close()
+        reopened.deleteLater()
+
+
+def test_sorting_by_year_keeps_the_column_layout(window, tmp_path, monkeypatch):
+    songs = [str(write_flac(tmp_path / f"song{i}.flac")) for i in range(3)]
+    monkeypatch.setattr(MainWindow, "scan_for_audio_files", lambda self, paths: list(paths))
+    window.add_tracks_to_current_playlist(songs)
+    table = window.current_table()
+    header = table.horizontalHeader()
+    header.moveSection(header.visualIndex(DEFAULT_COLUMNS.index("Album")), 0)
+    order = table.column_order()
+    widths = dict(window.settings.column_widths)
+
+    table.reorder(list(reversed(songs)))
+    assert table.column_order() == order
+    assert window.settings.column_widths == widths
+
+
 def arrow(key, repeat=False):
     return QKeyEvent(QEvent.KeyPress, key, Qt.NoModifier, "", repeat)
 

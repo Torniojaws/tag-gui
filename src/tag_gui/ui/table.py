@@ -1,5 +1,6 @@
+from contextlib import contextmanager
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from PySide6.QtCore import QEvent, QRect, Qt, Signal
 from PySide6.QtGui import QBrush, QColor, QKeySequence
@@ -89,6 +90,9 @@ class CenteredCheckDelegate(QStyledItemDelegate):
 class PlaylistTable(QTableWidget):
     # Emitted after the filter is re-run, so the search bar can update its match count.
     filter_applied = Signal()
+    # User edits to the columns; programmatic layout changes stay quiet.
+    columns_moved = Signal()
+    column_resized = Signal(str, int)  # header name, width
 
     def __init__(
         self, on_files_dropped, on_delete_pressed, on_copy_pressed, on_paste_pressed, parent=None
@@ -107,10 +111,14 @@ class PlaylistTable(QTableWidget):
         self.setStyleSheet(SELECTION_STYLE)
         self.setContextMenuPolicy(Qt.CustomContextMenu)
         self.setItemDelegate(CenteredCheckDelegate(self))
-        self.horizontalHeader().setSectionsMovable(False)
+        # Dragging only changes the visual order; code keeps addressing logical columns.
+        self.horizontalHeader().setSectionsMovable(True)
         self.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
         self.horizontalHeader().setResizeContentsPrecision(RESIZE_SAMPLE_ROWS)
         self.verticalHeader().setVisible(False)
+        self._quiet_layout = 0
+        self.horizontalHeader().sectionMoved.connect(self._on_section_moved)
+        self.horizontalHeader().sectionResized.connect(self._on_section_resized)
 
         # Sorting is driven from sectionClicked instead of setSortingEnabled so that a
         # newly clicked column starts descending, putting checked tags on top.
@@ -127,6 +135,56 @@ class PlaylistTable(QTableWidget):
         self.visible_rows = 0
         self._row_shades: List[int] = []
         self._shade_brushes = (QBrush(), QBrush())
+
+    @contextmanager
+    def quiet_layout(self):
+        """Column moves and resizes made inside are the app's own, not the user's."""
+        self._quiet_layout += 1
+        try:
+            yield
+        finally:
+            self._quiet_layout -= 1
+
+    def column_names(self) -> List[str]:
+        """Header names in logical (data) order."""
+        names = []
+        for column in range(self.columnCount()):
+            item = self.horizontalHeaderItem(column)
+            names.append(item.text() if item else "")
+        return names
+
+    def column_order(self) -> List[str]:
+        """Header names in the order they are shown."""
+        header = self.horizontalHeader()
+        names = self.column_names()
+        return [names[header.logicalIndex(visual)] for visual in range(len(names))]
+
+    def apply_column_layout(self, order: List[str], widths: Dict[str, int]):
+        """Show columns in ``order`` (unknown ones last) and set the stored widths."""
+        header = self.horizontalHeader()
+        names = self.column_names()
+        logical = {name: column for column, name in enumerate(names)}
+        target = [name for name in order if name in logical]
+        target += [name for name in names if name not in set(target)]
+        with self.quiet_layout():
+            for visual, name in enumerate(target):
+                current = header.visualIndex(logical[name])
+                if current != visual:
+                    header.moveSection(current, visual)
+            for name, width in widths.items():
+                if name in logical and self.columnWidth(logical[name]) != width:
+                    self.setColumnWidth(logical[name], width)
+
+    def _on_section_moved(self, _logical: int, _old_visual: int, _new_visual: int):
+        if not self._quiet_layout:
+            self.columns_moved.emit()
+
+    def _on_section_resized(self, logical: int, _old_size: int, new_size: int):
+        if self._quiet_layout or new_size <= 0:
+            return
+        item = self.horizontalHeaderItem(logical)
+        if item:
+            self.column_resized.emit(item.text(), new_size)
 
     def sort_by_column(self, column: int):
         if column == self._sort_column and self._sort_order == Qt.DescendingOrder:
@@ -162,15 +220,16 @@ class PlaylistTable(QTableWidget):
         key_column = self.columnCount()
         self.blockSignals(True)
         try:
-            self.insertColumn(key_column)
-            for row in range(self.rowCount()):
-                path_item = self.item(row, PATH_COLUMN)
-                track = path_item.data(Qt.UserRole) if path_item else None
-                key = QTableWidgetItem()
-                key.setData(Qt.DisplayRole, position.get(track, unknown + row))
-                self.setItem(row, key_column, key)
-            self.sortItems(key_column, Qt.AscendingOrder)
-            self.removeColumn(key_column)
+            with self.quiet_layout():
+                self.insertColumn(key_column)
+                for row in range(self.rowCount()):
+                    path_item = self.item(row, PATH_COLUMN)
+                    track = path_item.data(Qt.UserRole) if path_item else None
+                    key = QTableWidgetItem()
+                    key.setData(Qt.DisplayRole, position.get(track, unknown + row))
+                    self.setItem(row, key_column, key)
+                self.sortItems(key_column, Qt.AscendingOrder)
+                self.removeColumn(key_column)
         finally:
             self.blockSignals(False)
         self.clear_header_sort()

@@ -18,6 +18,7 @@ from ..core.models import Playlist
 from ..core.playlists import PlaylistStore
 from ..core.settings import load_settings, save_settings
 from ..core.utils import app_data_dir
+from .columns import ColumnsMixin
 from .dialogs import SettingsDialog
 from .file_actions import FileActionsMixin
 from .lastfm import LastfmController
@@ -39,6 +40,7 @@ class MainWindow(
     PlaybackMixin,
     SearchMixin,
     SortMixin,
+    ColumnsMixin,
 ):
     def __init__(self, splash=None):
         QMainWindow.__init__(self)
@@ -58,6 +60,7 @@ class MainWindow(
 
         self.lastfm = LastfmController(self.data_dir, self)
         self.lastfm.session_lost.connect(self.on_lastfm_session_lost)
+        self._build_column_sync()
         self._build_player()
         self._build_playback_widgets()
         self._build_tabs()
@@ -138,6 +141,7 @@ class MainWindow(
         table.itemDoubleClicked.connect(self.on_item_double_clicked)
         table.itemChanged.connect(self.on_item_changed)
         table.filter_applied.connect(self.update_search_count)
+        self.connect_column_sync(table)
         return table
 
     # ------------------------------------------------------------------ table
@@ -148,7 +152,9 @@ class MainWindow(
         )
         self._updating_table = True
         try:
-            fill_table(table, playlist, self.custom_tags, self.metadata, update)
+            with table.quiet_layout():
+                fill_table(table, playlist, self.custom_tags, self.metadata, update)
+            self.apply_column_layout(table)
         finally:
             finish()
             self._updating_table = False
@@ -188,6 +194,8 @@ class MainWindow(
     def closeEvent(self, event):
         self.cancel_sorting()
         self.lastfm.shutdown()
+        if self._column_save_timer.isActive():
+            self.save_column_layout()
         self.save_custom_tags()
         self.save_state()
         self.metadata.save()

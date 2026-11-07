@@ -1,6 +1,7 @@
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
+from typing import Dict, List
 
 SKIP_SECONDS_DEFAULT = 5
 SKIP_SECONDS_MIN = 1
@@ -14,6 +15,10 @@ class Settings:
     timebar_bottom: bool = True
     shuffle: bool = False
     scrobbling_paused: bool = False
+    # Playlist columns by header name, shared by every playlist. An empty order means the
+    # default; columns without a stored width are sized to their contents.
+    column_order: List[str] = field(default_factory=list)
+    column_widths: Dict[str, int] = field(default_factory=dict)
 
 
 def parse_skip_seconds(text: str, previous: int) -> int:
@@ -44,6 +49,17 @@ def load_settings(path: Path) -> Settings:
         settings.shuffle = data["shuffle"]
     if isinstance(data.get("scrobbling_paused"), bool):
         settings.scrobbling_paused = data["scrobbling_paused"]
+    order = data.get("column_order")
+    if isinstance(order, list):
+        names = [name for name in order if isinstance(name, str)]
+        settings.column_order = list(dict.fromkeys(names))
+    widths = data.get("column_widths")
+    if isinstance(widths, dict):
+        settings.column_widths = {
+            name: width
+            for name, width in widths.items()
+            if isinstance(width, int) and not isinstance(width, bool) and width > 0
+        }
     return settings
 
 
