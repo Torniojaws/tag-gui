@@ -175,6 +175,7 @@ class SortMixin(WindowContext):
         self.sort_combo.setEnabled(True)
         for track, position in read.items():
             self.metadata.remember_position(track, position)
+        self.show_track_numbers(read)
         self.apply_playlist_order(playlist, order)
 
     def cancel_sorting(self):

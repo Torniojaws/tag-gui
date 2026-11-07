@@ -16,6 +16,7 @@ from .tags import (
 # needs no bump when it can be derived from what older entries stored (see _migrate_fields).
 CACHE_VERSION = 2
 FIELD_COUNT = 6
+TRACK_FIELD = FIELD_COUNT - 1
 
 
 def track_text(track: int) -> str:
@@ -87,8 +88,7 @@ class MetadataCache:
     def track_position(self, track: str) -> Tuple[int, int]:
         info = self.get(track, ())
         if info.position is None:
-            info.position = read_track_position(Path(track))
-            self._dirty = True
+            self.remember_position(track, read_track_position(Path(track)))
         return info.position
 
     def cached_position(self, track: str) -> Optional[Tuple[int, int]]:
@@ -100,7 +100,17 @@ class MetadataCache:
         info = self._entries.get(track)
         if info is not None and info.position != position:
             info.position = position
+            if len(info.fields) == FIELD_COUNT:
+                info.fields[TRACK_FIELD] = track_text(position[1])
             self._dirty = True
+
+    def tracks_without_position(self, tracks: Iterable[str]) -> List[str]:
+        """Cached tracks whose track number has never been read."""
+        return [
+            track
+            for track in dict.fromkeys(tracks)
+            if track in self._entries and self._entries[track].position is None
+        ]
 
     def update_tag_state(self, track: str, tag: str, checked: bool) -> None:
         """Called after a successful write so the changed file is not re-read."""
@@ -174,13 +184,14 @@ def _migrate_fields(
 ) -> Optional[List[str]]:
     """Fields in the current layout, or None when the entry must be read again.
 
-    Entries from before the Track column have five fields; the track number they need is
-    already in the stored position, so big libraries are not re-read just for that column.
+    Entries from before the Track column have five fields. When the stored position has the
+    track number it fills the column; otherwise the column starts empty and the number is read
+    in the background (see ui/track_numbers.py), so big libraries still load from the cache.
     """
     if len(fields) == FIELD_COUNT:
         return fields
-    if len(fields) == FIELD_COUNT - 1 and position is not None:
-        return fields + [track_text(position[1])]
+    if len(fields) == FIELD_COUNT - 1:
+        return fields + [track_text(position[1]) if position is not None else ""]
     return None
 
 

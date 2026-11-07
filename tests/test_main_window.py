@@ -748,6 +748,7 @@ def test_playback_feeds_the_last_fm_play_tracker(window, tmp_path, monkeypatch):
     QTest.qWait(50)
     assert tracker.listened_ms() == paused
 
+
 def test_track_column_follows_album_and_sorts_by_number(window, tmp_path, monkeypatch):
     from tag_gui.constants import TRACK_COLUMN
     from tag_gui.core.tags import set_standard_tags
@@ -779,6 +780,7 @@ def test_a_saved_column_order_gets_the_new_track_column_after_album(window):
     window.add_playlist()
     order = window.current_table().column_order()
     assert order == ["Song", "Album", "Track", "Artist", "Duration", "Year"]
+
 
 def test_view_all_metadata_edits_the_file_and_refreshes_the_rows(window, tmp_path, monkeypatch):
     from tag_gui.core.tags import set_standard_tags
@@ -834,3 +836,29 @@ def test_metadata_dialog_keeps_open_when_saving_fails(qapp, tmp_path, monkeypatc
     dialog.accept()
     assert warnings == ["disk full"]
     assert dialog.result() != MetadataDialog.Accepted
+
+
+def test_missing_track_numbers_are_read_in_the_background(window, tmp_path, monkeypatch):
+    from tag_gui.constants import TRACK_COLUMN
+    from tag_gui.core.tags import set_standard_tags
+
+    songs = []
+    for index in range(3):
+        song = write_flac(tmp_path / f"n{index}.flac")
+        set_standard_tags(song, {"tracknumber": str(index + 5)})
+        songs.append(str(song))
+    monkeypatch.setattr(MainWindow, "scan_for_audio_files", lambda self, paths: list(paths))
+    window.add_tracks_to_current_playlist(songs)
+    table = window.current_table()
+    # As if loaded from a cache written before the Track column existed.
+    for row, track in enumerate(songs):
+        info = window.metadata.get(track, [])
+        info.position = None
+        info.fields[-1] = ""
+        table.item(row, TRACK_COLUMN).setText("")
+
+    window.fill_missing_track_numbers()
+    assert wait_until(lambda: window._track_number_worker is None)
+    QTest.qWait(50)
+    assert [table.item(row, TRACK_COLUMN).text() for row in range(3)] == ["5", "6", "7"]
+    assert window.metadata.cached_position(songs[0]) == (0, 5)

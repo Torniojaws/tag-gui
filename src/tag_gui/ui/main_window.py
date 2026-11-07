@@ -31,6 +31,7 @@ from .styles import ROW_MARGIN
 from .table import PlaylistTable
 from .table_fill import fill_table, refresh_rows
 from .tag_actions import TagActionsMixin
+from .track_numbers import TrackNumbersMixin
 
 
 class MainWindow(
@@ -41,6 +42,7 @@ class MainWindow(
     SearchMixin,
     SortMixin,
     ColumnsMixin,
+    TrackNumbersMixin,
 ):
     def __init__(self, splash=None):
         QMainWindow.__init__(self)
@@ -178,6 +180,7 @@ class MainWindow(
         self.tabs.setCurrentIndex(min(active_index, self.tabs.count() - 1))
         self.splash = None
         self.save_state()
+        self.fill_missing_track_numbers()
 
     def save_state(self):
         self.store.save(self.tabs.currentIndex())
@@ -193,6 +196,7 @@ class MainWindow(
 
     def closeEvent(self, event):
         self.cancel_sorting()
+        self.stop_track_numbers()
         self.lastfm.shutdown()
         if self._column_save_timer.isActive():
             self.save_column_layout()

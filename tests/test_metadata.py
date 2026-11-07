@@ -202,7 +202,7 @@ def test_entries_from_before_the_track_column_are_upgraded_without_a_reread(
                 "version": CACHE_VERSION,
                 "tracks": {
                     str(song): {"fields": old_fields, "mtime": mtime, "position": [1, 9]},
-                    # Without a stored position the track number is unknown, so it is re-read.
+                    # No stored position: the Track column waits for the background read.
                     str(other): {"fields": old_fields, "mtime": os.stat(other).st_mtime},
                 },
             }
@@ -212,6 +212,11 @@ def test_entries_from_before_the_track_column_are_upgraded_without_a_reread(
     cache = MetadataCache(path)
     cache.load()
     assert cache.get(str(song), []).fields == old_fields + ["9"]
+    # Without a stored position the column starts empty; nothing is read at load time.
+    assert cache.get(str(other), []).fields == old_fields + [""]
     assert reads["fields"] == 0
-    cache.get(str(other), [])
-    assert reads["fields"] == 1
+    assert cache.tracks_without_position([str(song), str(other), str(other)]) == [str(other)]
+
+    cache.remember_position(str(other), (1, 4))
+    assert cache.get(str(other), []).fields[-1] == "4"
+    assert cache.tracks_without_position([str(other)]) == []

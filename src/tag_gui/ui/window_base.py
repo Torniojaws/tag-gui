@@ -82,5 +82,8 @@ class WindowContext(QMainWindow):
     def apply_search_to_current(self) -> None:
         raise NotImplementedError
 
+    def show_track_numbers(self, positions) -> None:
+        raise NotImplementedError
+
     def update_search_count(self) -> None:
         raise NotImplementedError
