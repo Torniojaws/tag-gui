@@ -14,7 +14,7 @@ def reads(monkeypatch):
 
     def fake_fields(path, easy=None):
         counts["fields"] += 1
-        return ["Kaija", "00:03", path.stem, "1999", "Talvi"]
+        return ["Kaija", "00:03", path.stem, "1999", "Talvi", "4"]
 
     def fake_states(path, tag_names):
         counts["tags"] += 1
@@ -175,3 +175,43 @@ def test_track_position_parses_numbers_like_3_of_12(tmp_path):
     assert read_track_position(song) == (0, 0)
     set_standard_tags(song, {"tracknumber": "3/12", "discnumber": "2"})
     assert read_track_position(song) == (2, 3)
+
+
+def test_track_fields_end_with_the_track_number(tmp_path):
+    from conftest import write_flac
+    from tag_gui.core.metadata import track_fields
+    from tag_gui.core.tags import set_standard_tags
+
+    song = write_flac(tmp_path / "numbered.flac")
+    assert track_fields(song)[-1] == ""
+    set_standard_tags(song, {"tracknumber": "07/12", "album": "Talvi"})
+    assert track_fields(song)[-2:] == ["Talvi", "7"]
+
+
+def test_entries_from_before_the_track_column_are_upgraded_without_a_reread(
+    reads, song, tmp_path
+):
+    other = tmp_path / "other.mp3"
+    other.write_bytes(b"x")
+    mtime = os.stat(song).st_mtime
+    old_fields = ["Kaija", "00:03", "song", "1999", "Talvi"]
+    path = tmp_path / "metadata.json"
+    path.write_text(
+        json.dumps(
+            {
+                "version": CACHE_VERSION,
+                "tracks": {
+                    str(song): {"fields": old_fields, "mtime": mtime, "position": [1, 9]},
+                    # Without a stored position the track number is unknown, so it is re-read.
+                    str(other): {"fields": old_fields, "mtime": os.stat(other).st_mtime},
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    cache = MetadataCache(path)
+    cache.load()
+    assert cache.get(str(song), []).fields == old_fields + ["9"]
+    assert reads["fields"] == 0
+    cache.get(str(other), [])
+    assert reads["fields"] == 1

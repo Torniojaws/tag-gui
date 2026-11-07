@@ -15,7 +15,7 @@ PLAYLIST_FILE_FILTER = "Playlists (*.m3u *.m3u8)"
 
 ICON_SIZES = (16, 24, 32, 48, 64, 128, 256)
 
-DEFAULT_COLUMNS = ["Artist", "Duration", "Song", "Year", "Album"]
+DEFAULT_COLUMNS = ["Artist", "Duration", "Song", "Year", "Album", "Track"]
 # Editable standard columns, paired with their mutagen easy-tag key. Duration is derived.
 STANDARD_TAG_FIELDS = (("Artist", "artist"), ("Song", "title"), ("Year", "date"), ("Album", "album"))
 ARTIST_COLUMN = DEFAULT_COLUMNS.index("Artist")
@@ -23,6 +23,7 @@ SONG_COLUMN = DEFAULT_COLUMNS.index("Song")
 ALBUM_COLUMN = DEFAULT_COLUMNS.index("Album")
 YEAR_COLUMN = DEFAULT_COLUMNS.index("Year")
 DURATION_COLUMN = DEFAULT_COLUMNS.index("Duration")
+TRACK_COLUMN = DEFAULT_COLUMNS.index("Track")
 # The column whose items carry the file path in Qt.UserRole.
 PATH_COLUMN = 0
 LEFT_ALIGNED_HEADERS = tuple(

@@ -12,12 +12,13 @@ from ..constants import (
     LEFT_ALIGNED_HEADERS,
     PATH_COLUMN,
     POPULATE_BATCH,
+    TRACK_COLUMN,
     YEAR_COLUMN,
 )
 from ..core.metadata import MetadataCache
 from ..core.models import Playlist
 from .styles import DURATION_COLUMN_PADDING
-from .table import PlaylistTable, TagCheckItem
+from .table import NumberItem, PlaylistTable, TagCheckItem
 
 TAG_NAME_ROLE = Qt.UserRole + 1
 
@@ -72,10 +73,10 @@ def _set_headers(table: PlaylistTable, custom_tags: Sequence[str]) -> None:
 
 
 def _field_item(value: str, column: int, track: str) -> QTableWidgetItem:
-    item = QTableWidgetItem(value)
+    item = NumberItem(value) if column == TRACK_COLUMN else QTableWidgetItem(value)
     # Standard tags are edited through the right-click dialog, never inline.
     item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
-    if column == YEAR_COLUMN:
+    if column in (YEAR_COLUMN, TRACK_COLUMN):
         item.setTextAlignment(Qt.AlignCenter)
     elif column == DURATION_COLUMN:
         item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)

@@ -12,8 +12,14 @@ from .tags import (
     read_track_position,
 )
 
-# Bumped whenever the field order changes, so stale entries are discarded.
+# Bumped whenever the field order changes, so stale entries are discarded. Appending a field
+# needs no bump when it can be derived from what older entries stored (see _migrate_fields).
 CACHE_VERSION = 2
+FIELD_COUNT = 6
+
+
+def track_text(track: int) -> str:
+    return str(track) if track > 0 else ""
 
 
 def track_fields(path: Path, easy=None) -> List[str]:
@@ -25,7 +31,8 @@ def track_fields(path: Path, easy=None) -> List[str]:
     album = get_field(easy, "album") if easy else ""
     date = get_field(easy, "date") if easy else ""
     year = date[:4] if date else ""
-    return [artist, get_duration(path), title or path.stem, year, album]
+    _disc, track = position_from_tags(easy)
+    return [artist, get_duration(path), title or path.stem, year, album, track_text(track)]
 
 
 def file_mtime(path: Path) -> float:
@@ -119,11 +126,15 @@ class MetadataCache:
             return
         for track, entry in data.get("tracks", {}).items():
             try:
+                position = _position(entry.get("position"))
+                fields = _migrate_fields([str(v) for v in entry["fields"]], position)
+                if fields is None:
+                    continue  # re-read on first use
                 self._entries[track] = TrackInfo(
-                    fields=[str(v) for v in entry["fields"]],
+                    fields=fields,
                     mtime=float(entry["mtime"]),
                     tag_states={str(k): bool(v) for k, v in entry.get("tags", {}).items()},
-                    position=_position(entry.get("position")),
+                    position=position,
                 )
             except (KeyError, TypeError, ValueError):
                 continue
@@ -156,6 +167,21 @@ def _entry(info: TrackInfo) -> dict:
     if info.position is not None:
         entry["position"] = list(info.position)
     return entry
+
+
+def _migrate_fields(
+    fields: List[str], position: Optional[Tuple[int, int]]
+) -> Optional[List[str]]:
+    """Fields in the current layout, or None when the entry must be read again.
+
+    Entries from before the Track column have five fields; the track number they need is
+    already in the stored position, so big libraries are not re-read just for that column.
+    """
+    if len(fields) == FIELD_COUNT:
+        return fields
+    if len(fields) == FIELD_COUNT - 1 and position is not None:
+        return fields + [track_text(position[1])]
+    return None
 
 
 def _position(value) -> Optional[Tuple[int, int]]:

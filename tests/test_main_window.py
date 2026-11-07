@@ -238,7 +238,7 @@ def test_column_order_and_widths_are_shared_and_remembered(window, tmp_path, mon
     header = first.horizontalHeader()
     header.moveSection(header.visualIndex(DEFAULT_COLUMNS.index("Song")), 0)
     header.resizeSection(DEFAULT_COLUMNS.index("Artist"), 333)
-    expected_order = ["Song", "Artist", "Duration", "Year", "Album"]
+    expected_order = ["Song", "Artist", "Duration", "Year", "Album", "Track"]
     assert first.column_order() == expected_order
     assert other.column_order() == expected_order
     assert other.columnWidth(DEFAULT_COLUMNS.index("Artist")) == 333
@@ -747,6 +747,38 @@ def test_playback_feeds_the_last_fm_play_tracker(window, tmp_path, monkeypatch):
     paused = tracker.listened_ms()
     QTest.qWait(50)
     assert tracker.listened_ms() == paused
+
+def test_track_column_follows_album_and_sorts_by_number(window, tmp_path, monkeypatch):
+    from tag_gui.constants import TRACK_COLUMN
+    from tag_gui.core.tags import set_standard_tags
+
+    songs = []
+    for name, number in (("a", "10"), ("b", "2/12"), ("c", ""), ("d", "1")):
+        song = write_flac(tmp_path / f"{name}.flac")
+        if number:
+            set_standard_tags(song, {"tracknumber": number})
+        songs.append(str(song))
+    monkeypatch.setattr(MainWindow, "scan_for_audio_files", lambda self, paths: list(paths))
+    window.add_tracks_to_current_playlist(songs)
+    table = window.current_table()
+    assert DEFAULT_COLUMNS[TRACK_COLUMN - 1] == "Album"
+
+    def tracks():
+        return [table.item(row, TRACK_COLUMN).text() for row in range(table.rowCount())]
+
+    assert tracks() == ["10", "2", "", "1"]
+    table.sort_by_column(TRACK_COLUMN)
+    assert table.horizontalHeader().sortIndicatorOrder() == Qt.AscendingOrder
+    assert tracks() == ["", "1", "2", "10"]
+    table.sort_by_column(TRACK_COLUMN)
+    assert tracks() == ["10", "2", "1", ""]
+
+
+def test_a_saved_column_order_gets_the_new_track_column_after_album(window):
+    window.settings.column_order = ["Song", "Album", "Artist", "Duration", "Year"]
+    window.add_playlist()
+    order = window.current_table().column_order()
+    assert order == ["Song", "Album", "Track", "Artist", "Duration", "Year"]
 
 def test_view_all_metadata_edits_the_file_and_refreshes_the_rows(window, tmp_path, monkeypatch):
     from tag_gui.core.tags import set_standard_tags

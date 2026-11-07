@@ -45,6 +45,19 @@ class TagCheckItem(QTableWidgetItem):
         return super().__lt__(other)
 
 
+def _number(text: str) -> int:
+    return int(text) if text.isdigit() else -1
+
+
+class NumberItem(QTableWidgetItem):
+    """Sorts by value, so track 2 comes before track 10; empty cells sort first."""
+
+    def __lt__(self, other):
+        if isinstance(other, QTableWidgetItem):
+            return _number(self.text()) < _number(other.text())
+        return super().__lt__(other)
+
+
 class CenteredCheckDelegate(QStyledItemDelegate):
     """Qt always lays the check indicator out on the left, so draw it centered instead."""
 
@@ -169,11 +182,21 @@ class PlaylistTable(QTableWidget):
         return [names[header.logicalIndex(visual)] for visual in range(len(names))]
 
     def apply_column_layout(self, order: List[str], widths: Dict[str, int]):
-        """Show columns in ``order`` (unknown ones last) and set the stored widths."""
+        """Show columns in ``order`` and set the stored widths.
+
+        A standard column missing from ``order`` (added in a newer version) goes right after
+        the standard column before it; other unknown columns, like new custom tags, go last.
+        """
         header = self.horizontalHeader()
         names = self.column_names()
         logical = {name: column for column, name in enumerate(names)}
         target = [name for name in order if name in logical]
+        if target:
+            for index, name in enumerate(DEFAULT_COLUMNS):
+                if name in logical and name not in target:
+                    previous = DEFAULT_COLUMNS[index - 1] if index else None
+                    at = target.index(previous) + 1 if previous in target else 0
+                    target.insert(at, name)
         target += [name for name in names if name not in set(target)]
         with self.quiet_layout():
             for visual, name in enumerate(target):
