@@ -17,7 +17,13 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
 )
 
-from ..constants import ALBUM_COLUMN, AUDIO_EXTENSIONS, PATH_COLUMN, SEARCH_COLUMNS
+from ..constants import (
+    ALBUM_COLUMN,
+    AUDIO_EXTENSIONS,
+    DEFAULT_COLUMNS,
+    PATH_COLUMN,
+    SEARCH_COLUMNS,
+)
 from .styles import ALBUM_TINT_DARK, ALBUM_TINT_LIGHT, SELECTION_STYLE
 
 # Rows that auto-size against every entry are too slow for large playlists.
@@ -120,10 +126,11 @@ class PlaylistTable(QTableWidget):
         self.horizontalHeader().sectionMoved.connect(self._on_section_moved)
         self.horizontalHeader().sectionResized.connect(self._on_section_resized)
 
-        # Sorting is driven from sectionClicked instead of setSortingEnabled so that a
-        # newly clicked column starts descending, putting checked tags on top.
+        # Sorting is driven from sectionClicked instead of setSortingEnabled so that a newly
+        # clicked standard column starts ascending and a tag column descending; each further
+        # click on the same column flips the order.
         self._sort_column = -1
-        self._sort_order = Qt.DescendingOrder
+        self._sort_order = Qt.AscendingOrder
         self.horizontalHeader().setSectionsClickable(True)
         self.horizontalHeader().setSortIndicatorShown(True)
         self.horizontalHeader().sectionClicked.connect(self.sort_by_column)
@@ -187,9 +194,13 @@ class PlaylistTable(QTableWidget):
             self.column_resized.emit(item.text(), new_size)
 
     def sort_by_column(self, column: int):
-        if column == self._sort_column and self._sort_order == Qt.DescendingOrder:
+        if column == self._sort_column:
+            flipped = self._sort_order == Qt.AscendingOrder
+            order = Qt.DescendingOrder if flipped else Qt.AscendingOrder
+        elif column < len(DEFAULT_COLUMNS):
             order = Qt.AscendingOrder
         else:
+            # Custom tag columns start descending, putting checked tags on top.
             order = Qt.DescendingOrder
         self._sort_column = column
         self._sort_order = order
@@ -206,8 +217,8 @@ class PlaylistTable(QTableWidget):
     def clear_header_sort(self):
         """Forget the clicked column, so rows show in playlist order again."""
         self._sort_column = -1
-        self._sort_order = Qt.DescendingOrder
-        self.horizontalHeader().setSortIndicator(-1, Qt.DescendingOrder)
+        self._sort_order = Qt.AscendingOrder
+        self.horizontalHeader().setSortIndicator(-1, Qt.AscendingOrder)
 
     def reorder(self, tracks: List[str]):
         """Move rows into the order of ``tracks`` without rebuilding any items.

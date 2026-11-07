@@ -1,7 +1,7 @@
 """One offscreen run of the real window, so a broken mixin or layout fails the suite."""
 
 import pytest
-from PySide6.QtCore import QEvent, QItemSelectionModel, Qt
+from PySide6.QtCore import QEvent, QItemSelectionModel, QPoint, Qt
 from PySide6.QtGui import QKeyEvent
 from PySide6.QtMultimedia import QMediaPlayer
 from PySide6.QtTest import QTest
@@ -441,6 +441,56 @@ def test_hidden_rows_are_left_out_of_selection_and_playback(filtered_window, mon
     assert window.current_track_index == visible[0]
     window.play_previous()
     assert window.current_track_index == visible[1]
+
+
+def test_header_clicks_start_ascending_and_flip(filtered_window):
+    window = filtered_window
+    table = window.current_table()
+    header = table.horizontalHeader()
+    artist, album = DEFAULT_COLUMNS.index("Artist"), DEFAULT_COLUMNS.index("Album")
+
+    def click(column):
+        section = header.sectionViewportPosition(column) + header.sectionSize(column) // 2
+        QTest.mouseClick(header.viewport(), Qt.LeftButton, pos=QPoint(section, 5))
+
+    def column_values(column):
+        return [table.item(row, column).text() for row in range(table.rowCount())]
+
+    steps = [
+        (artist, Qt.AscendingOrder),
+        (artist, Qt.DescendingOrder),
+        (album, Qt.AscendingOrder),
+        (artist, Qt.AscendingOrder),
+        (album, Qt.AscendingOrder),
+        (album, Qt.DescendingOrder),
+        (album, Qt.AscendingOrder),
+    ]
+    for column, order in steps:
+        click(column)
+        assert header.sortIndicatorSection() == column
+        assert header.sortIndicatorOrder() == order
+        values = column_values(column)
+        assert values == sorted(values, reverse=order == Qt.DescendingOrder)
+
+
+def test_tag_column_clicks_start_descending(filtered_window):
+    window = filtered_window
+    window.tags_input.setText("rock")
+    window.apply_custom_tags()
+    table = window.current_table()
+    header = table.horizontalHeader()
+    tag, artist = len(DEFAULT_COLUMNS), DEFAULT_COLUMNS.index("Artist")
+
+    for column, order in [
+        (tag, Qt.DescendingOrder),
+        (tag, Qt.AscendingOrder),
+        (tag, Qt.DescendingOrder),
+        (artist, Qt.AscendingOrder),
+        (tag, Qt.DescendingOrder),
+    ]:
+        table.sort_by_column(column)
+        assert header.sortIndicatorSection() == column
+        assert header.sortIndicatorOrder() == order
 
 
 def test_filter_survives_sorting_and_tab_switches(filtered_window):

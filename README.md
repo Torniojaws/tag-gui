@@ -178,7 +178,7 @@ workflow run as artifacts.
 - Tag names are displayed as typed but stored as ASCII (`Yömusa` is written to files as `Yomusa`)
 - Custom tag value `X` means checked; unchecking removes the tag from the file, checking writes it back
 - Rows are shaded per album run: the shade flips whenever the album changes, so consecutive tracks of one album share a background
-- Sortable/resizable columns with horizontal scrolling; a header click sorts descending first (checked tags on top) and scrolls back to the top
+- Sortable/resizable columns with horizontal scrolling. Clicking Artist, Duration, Song, Year or Album sorts ascending (A-Z, oldest first); a custom tag column starts descending instead (checked tags on top). Clicking the same header again flips the order, and clicking a different header starts that column over. Each sort scrolls back to the top
 - Drag a column header to reorder the columns, or drag a header edge to resize a column; the order and widths apply to every playlist, including new ones, and are remembered between sessions (`settings.json`). Columns you have not resized fit their contents, and new custom tag columns go last
 - Splash screen with the app version and a progress bar while playlists load at startup; the version is also shown in the window title
 - Tags read from files are cached in `metadata.json` under app data and reused until a file's timestamp changes, so restarts do not re-read every file
