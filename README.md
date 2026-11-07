@@ -21,19 +21,50 @@ This is almost entirely AI-generated, so no warranties :D
 1. Open https://github.com/Torniojaws/tag-gui/releases
 2. Windows:
    1. Download the file `tag-gui-v<version>.exe` (e.g. `tag-gui-v1.0.0.exe`) and run it
+   2. The executable is not code-signed, so Windows may show "Windows protected your PC". Click
+      **More info** -> **Run anyway**
 3. For Debian-like (Linux Mint, Ubuntu, etc):
    1. Download the file `tag-gui-v<version>-linux-x86_64` (e.g. `tag-gui-v1.0.0-linux-x86_64`)
    2. Give it execute permissions with: `chmod +x tag-gui-v1.0.0-linux-x86_64`
    3. And then run it
+   4. If it fails with `Could not load the Qt platform plugin "xcb"`, install the missing library
+      with `sudo apt install libxcb-cursor0` and run it again
 4. Optional: to scrobble to Last.fm, open Settings -> Connect to Last.fm... and allow Tag GUI in
    the browser. No API key or other setup is needed with the released builds.
 
 ## Run from source code
 
+Needs Python 3.9 or newer (the automated builds use 3.14). A virtual environment in `.venv` is
+recommended; `build.py` uses it automatically when it exists.
+
 ```bash
+python3 -m venv .venv          # Windows: py -m venv .venv
+source .venv/bin/activate      # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 python app.py
 ```
+
+On Debian-like systems, install venv support first with `sudo apt install python3-venv` if
+`python3 -m venv` reports that it is missing. Inside the activated environment `python` works on
+every system, so the rest of this README uses it.
+
+Without the Last.fm API key file the app works normally but cannot scrobble; see
+[Last.fm API key](#lastfm-api-key-only-when-running-or-building-from-source).
+
+## App data
+
+Playlists, settings and caches are stored in `~/.config/tag-gui` on Linux,
+`%APPDATA%\tag-gui` on Windows and `~/Library/Application Support/tag-gui` on macOS:
+
+| File | Contents |
+|---|---|
+| `default.m3u`, `default2.m3u`, ... | playlists created in the app (loaded playlists stay where they are) |
+| `playlists.json` | the open tabs, their files and the active tab |
+| `settings.json` | skip step, timebar position, shuffle, scrobbling pause, column order and widths |
+| `custom_tags.txt` | the custom checkbox tags |
+| `metadata.json` | cached tags, so restarts do not re-read every file |
+| `lastfm.json` | the Last.fm user name and session key |
+| `scrobble_queue.json` | plays waiting to be sent to Last.fm |
 
 ## Layout
 
@@ -42,6 +73,8 @@ app.py                     entry point (adds src/ to sys.path, calls tag_gui.mai
 make_icon.py               writes tag-gui.ico
 build.py / build.cmd       build tasks
 src/tag_gui/
+    __init__.py            app version (__version__)
+    _lastfm_keys.py        Last.fm API key and secret; gitignored, see below
     constants.py           file types, columns, batching
     main.py                QApplication setup
     core/                  no Qt widgets, only files, tags and playlists
@@ -88,29 +121,46 @@ tests/                     pytest suite, run with `python build.py test`
 ## Tests
 
 ```bash
-pip install pytest
+python build.py deps    # once: the app's requirements plus pytest and PyInstaller
 python build.py test
 ```
 
-The suite covers `core/` (m3u and state files, tag normalization and writing, the metadata cache,
-file scanning) plus one offscreen run of the real `MainWindow`. Test audio is synthesised by
+The suite covers `core/` (m3u and state files, settings, tag normalization and writing, the
+metadata cache, file scanning, copying, sorting, shuffle and the Last.fm client and scrobble queue)
+and runs the real `MainWindow` offscreen to check playlists, search, sorting, columns, playback
+keys and Last.fm play tracking. Test audio is synthesised by
 [tests/conftest.py](tests/conftest.py), so no binary fixtures are checked in, and the window tests
-set `QT_QPA_PLATFORM=offscreen` so they need no display.
+set `QT_QPA_PLATFORM=offscreen` so they need no display. They make no network calls.
 
 ## Build a standalone executable
 
-[`python build.py`](build.py) runs the build steps in sequence and needs nothing but Python:
+[`python build.py`](build.py) runs one or more tasks in the order given and needs nothing but
+Python:
 
-`.\build` is the [`build.cmd`](build.cmd) wrapper; PowerShell requires the `.\` prefix, `cmd.exe`
-does not. On macOS/Linux run `python build.py <task>` instead.
+| Task | What it does |
+|---|---|
+| `deps` | installs `requirements.txt`, PyInstaller and pytest |
+| `test` | runs the test suite |
+| `icon` | regenerates `tag-gui.ico` when its sources changed |
+| `build` | builds the executable (the default when no task is given) |
+| `run` | starts the built executable |
+| `clean` | removes `build/`, `dist/` and `tag-gui.spec` |
+
+For example `python build.py deps test build` installs everything, runs the tests and builds. On
+Windows `.\build deps test build` does the same through the [`build.cmd`](build.cmd) wrapper;
+PowerShell requires the `.\` prefix, `cmd.exe` does not.
 
 The equivalent commands by hand are:
 
 ```bash
-pip install pyinstaller
-python make_icon.py   # only needed if tag-gui.ico is missing or the icon changed
-pyinstaller --noconfirm --clean --onefile --windowed --icon tag-gui.ico --name tag-gui app.py
+pip install -r requirements.txt pyinstaller
+python make_icon.py   # Windows only, and only if tag-gui.ico is missing or the icon changed
+pyinstaller --noconfirm --clean --onefile --windowed --paths src --icon tag-gui.ico --name tag-gui app.py
 ```
+
+Leave out `--icon tag-gui.ico` on Linux and macOS, where PyInstaller does not embed it. When
+`src/tag_gui/_lastfm_keys.py` exists, add `--hidden-import tag_gui._lastfm_keys` so the build can
+scrobble (`build.py` does this automatically).
 
 The binary is written to `dist/tag-gui` (`dist\tag-gui.exe` on Windows) and needs no Python
 installation. PyInstaller is not a cross-compiler, so build on the platform you target.
@@ -160,8 +210,8 @@ workflow run as artifacts.
 
 ## Features
 
-- Drag and drop audio files (`.mp3`, `.flac`, `.fla`, `.wma`, `.aac`) or whole folders into playlist tables, or use the Add Files button
-- Copy and paste one or more selected songs between playlists
+- Drag and drop audio files (`.mp3`, `.flac`, `.fla`, `.wma`, `.aac`) or whole folders into playlist tables, or use the Add Files button. WAV files are refused with a warning, because they cannot hold tags
+- `Ctrl+C`/`Ctrl+V` copy and paste one or more selected songs between playlists; files copied in a file manager can be pasted in too
 - Dropped folders are scanned recursively with a cancellable progress dialog; tags are then read in batches so large trees stay responsive
 - Select rows (shift/ctrl click, `Ctrl+A`) and press `Delete` to remove them; removing several asks for confirmation
 - `Home`/`End` scroll the playlist to the top/bottom without changing the selection
@@ -170,11 +220,12 @@ workflow run as artifacts.
 - Playlist columns: Artist, Duration, Song, Year, Album
 - Standard tags are edited via right-click -> Edit tags, which writes only the fields you changed, across every selected row (Duration is read-only)
 - Double-click row to play, plus Previous/Play/Pause/Stop/Next controls
+- Volume slider with a separate mute button, so unmuting returns to the same volume
 - Shuffle checkbox next to the Next button (remembered between sessions): Next and the end of a song pick a random visible track that shares no artist, album or song with the last 10 played, preferring tracks not yet heard this round. Songs are matched fuzzily, so `Song (Cover)`, `Song - Live 2018` and `Song Live at Wembley` count as `Song`. If everything clashes (e.g. a single-artist playlist) it relaxes the rule instead of stopping. Previous steps back through the tracks that actually played
 - Last.fm scrobbling: Settings -> Connect to Last.fm opens last.fm in the browser, where you allow Tag GUI; the app never sees your password and keeps only the session key (`lastfm.json` under app data). Each track sends "now playing" and is scrobbled once it has played for half its length or 4 minutes (tracks of 30 s or less never count). Only time actually played counts, so pausing or skipping ahead does not, and files without artist and title tags are not scrobbled. Network calls run in the background; plays that cannot be sent (offline, Last.fm down, logged out) are kept in `scrobble_queue.json` and sent later. The "Pause scrobbling" checkbox in Settings (remembered between sessions) stops scrobbling and "now playing" updates; tracks heard while it is checked are not tracked, so only tracks started after unchecking it are scrobbled
 - Clickable seek/progress bar, shown at the top, bottom or both (Settings...)
 - While a song plays, `Left`/`Right` skip back/forward by a configurable step (1-60 s, default 5); skipping stops at the start of the song, and skipping past the end starts the next song, which a held key does not keep scrubbing
-- Custom checkbox-tag columns via comma-separated textbox (persisted in `custom_tags.txt` under app data)
+- Custom checkbox-tag columns: type comma-separated tag names in the textbox above the playlists and click Apply Tags (persisted in `custom_tags.txt` under app data)
 - Tag names are displayed as typed but stored as ASCII (`Yömusa` is written to files as `Yomusa`)
 - Custom tag value `X` means checked; unchecking removes the tag from the file, checking writes it back
 - Rows are shaded per album run: the shade flips whenever the album changes, so consecutive tracks of one album share a background
@@ -183,9 +234,9 @@ workflow run as artifacts.
 - Splash screen with the app version and a progress bar while playlists load at startup; the version is also shown in the window title
 - Tags read from files are cached in `metadata.json` under app data and reused until a file's timestamp changes, so restarts do not re-read every file
 - Tabbed M3U playlists persisted between sessions (`default.m3u`, `default2.m3u`, ...)
-- Double-click empty tab bar space to add the next `defaultN` playlist
+- Double-click empty tab bar space to add the next `defaultN` playlist; right-clicking the tab bar also offers Add playlist and Load playlist...
+- Drag tabs to reorder the playlists; the order is remembered
 - Double-click a tab to rename the playlist in place; the `.m3u` is renamed to an ASCII slug (`Äidille musaa` -> `aidille-musaa.m3u`) and the display name is stored in the file's `#PLAYLIST` header
 - Close a playlist with its tab `X`, middle-click, or right-click -> Remove playlist; it asks first and never deletes the `.m3u`
-- Load Playlist opens any existing `.m3u` as a new rightmost tab and keeps updating it in place; Save As points the playlist at a new file
+- Load Playlist opens any existing `.m3u` or `.m3u8` as a new rightmost tab and keeps updating it in place; Save As points the playlist at a new file
 - Copy files to dir copies every file in the current playlist into a chosen directory with a cancellable progress bar; originals are left untouched, files already there with the same name and size are skipped, and other name clashes get a numbered name (`song (2).flac`) instead of being overwritten
-- Rename/Save As for playlist name and `.m3u` filename
