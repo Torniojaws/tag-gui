@@ -9,36 +9,70 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
+from mutagen.apev2 import APEBinaryValue, APEv2, APETextValue, is_valid_apev2_key
 from mutagen.asf import ASFTags, ASFUnicodeAttribute
 from mutagen.id3 import COMM, ID3, TXXX, USLT, WXXX, Frames, PairedTextFrame, TextFrame, UrlFrame
+from mutagen.mp4 import AtomDataType, MP4Cover, MP4FreeForm, MP4Tags
 from mutagen._vorbis import VComment
 
-from .tags import load_raw_tags
+from .tags import MP4_CUSTOM_PREFIX, load_raw_tags
 from .utils import seconds_to_mmss
 
 ID3_KIND = "id3"
 VORBIS_KIND = "vorbis"
 ASF_KIND = "asf"
+MP4_KIND = "mp4"
+APE_KIND = "ape"
 
 # Fields most players show first, in this order; everything else follows in file order.
+# Columns: label, then the keys in ID3, Vorbis, ASF, MP4 and APEv2 tags.
 STANDARD_FIELDS = (
-    ("Title", {"TIT2"}, {"TITLE"}, {"Title"}),
-    ("Artist", {"TPE1"}, {"ARTIST"}, {"Author"}),
-    ("Album", {"TALB"}, {"ALBUM"}, {"WM/AlbumTitle"}),
-    ("Album artist", {"TPE2"}, {"ALBUMARTIST", "ALBUM ARTIST"}, {"WM/AlbumArtist"}),
-    ("Track number", {"TRCK"}, {"TRACKNUMBER"}, {"WM/TrackNumber", "WM/Track"}),
-    ("Disc number", {"TPOS"}, {"DISCNUMBER"}, {"WM/PartOfSet"}),
-    ("Date", {"TDRC", "TYER"}, {"DATE", "YEAR"}, {"WM/Year"}),
-    ("Genre", {"TCON"}, {"GENRE"}, {"WM/Genre"}),
-    ("Composer", {"TCOM"}, {"COMPOSER"}, {"WM/Composer"}),
-    ("Comment", {"COMM"}, {"COMMENT", "DESCRIPTION"}, {"Description"}),
+    ("Title", {"TIT2"}, {"TITLE"}, {"Title"}, {"©nam"}, {"TITLE"}),
+    ("Artist", {"TPE1"}, {"ARTIST"}, {"Author"}, {"©ART"}, {"ARTIST"}),
+    ("Album", {"TALB"}, {"ALBUM"}, {"WM/AlbumTitle"}, {"©alb"}, {"ALBUM"}),
+    (
+        "Album artist",
+        {"TPE2"},
+        {"ALBUMARTIST", "ALBUM ARTIST"},
+        {"WM/AlbumArtist"},
+        {"aART"},
+        {"ALBUM ARTIST", "ALBUMARTIST"},
+    ),
+    ("Track number", {"TRCK"}, {"TRACKNUMBER"}, {"WM/TrackNumber", "WM/Track"}, {"trkn"}, {"TRACK"}),
+    ("Disc number", {"TPOS"}, {"DISCNUMBER"}, {"WM/PartOfSet"}, {"disk"}, {"DISC"}),
+    ("Date", {"TDRC", "TYER"}, {"DATE", "YEAR"}, {"WM/Year"}, {"©day"}, {"YEAR"}),
+    ("Genre", {"TCON"}, {"GENRE"}, {"WM/Genre"}, {"©gen", "gnre"}, {"GENRE"}),
+    ("Composer", {"TCOM"}, {"COMPOSER"}, {"WM/Composer"}, {"©wrt"}, {"COMPOSER"}),
+    ("Comment", {"COMM"}, {"COMMENT", "DESCRIPTION"}, {"Description"}, {"©cmt"}, {"COMMENT"}),
 )
-_KIND_COLUMN = {ID3_KIND: 1, VORBIS_KIND: 2, ASF_KIND: 3}
+_KIND_COLUMN = {ID3_KIND: 1, VORBIS_KIND: 2, ASF_KIND: 3, MP4_KIND: 4, APE_KIND: 5}
+# Tag formats whose keys are case-insensitive; their STANDARD_FIELDS keys are upper case.
+_CASELESS_KINDS = (VORBIS_KIND, APE_KIND)
 
 ADD_FIELD_HINTS = {
     ID3_KIND: "An ID3 frame such as TCOM, or TXXX:Name for a custom text field",
     VORBIS_KIND: "Any name, e.g. COMPOSER or MOOD",
     ASF_KIND: "Any name, e.g. WM/Composer",
+    MP4_KIND: f"An atom such as ©wrt, or {MP4_CUSTOM_PREFIX}Name for a custom text field",
+    APE_KIND: "Any name, e.g. Composer or Mood",
+}
+
+# MP4 atoms outside STANDARD_FIELDS that have a well-known meaning.
+_MP4_LABELS = {
+    "©too": "Encoder",
+    "©lyr": "Lyrics",
+    "©grp": "Grouping",
+    "cpil": "Compilation",
+    "tmpo": "BPM",
+    "desc": "Description",
+    "cprt": "Copyright",
+}
+# Atoms holding (number, total) pairs, shown and edited as "3/12".
+_MP4_PAIR_ATOMS = ("trkn", "disk")
+# Text atoms whose names do not start with ©; those starting with © are all text.
+_MP4_TEXT_ATOMS = {
+    "aART", "desc", "ldes", "cprt", "soar", "soal", "soaa", "sonm", "soco", "sosn", "tvsh",
+    "purl", "egid", "catg", "keyw",
 }
 
 
@@ -68,7 +102,7 @@ def _single_line(value: str) -> bool:
 def _standard_rank(kind: str, key: str) -> Tuple[int, str]:
     column = _KIND_COLUMN[kind]
     base = key.split(":")[0] if kind == ID3_KIND else key
-    compare = base.upper() if kind == VORBIS_KIND else base
+    compare = base.upper() if kind in _CASELESS_KINDS else base
     for index, row in enumerate(STANDARD_FIELDS):
         if compare in row[column]:
             return index, row[0]
@@ -139,6 +173,63 @@ def _asf_entries(tags: ASFTags) -> List[TagEntry]:
     return entries
 
 
+def _mp4_label(key: str) -> str:
+    _rank, label = _standard_rank(MP4_KIND, key)
+    if label:
+        return label
+    if key == "covr":
+        return "Picture"
+    if key.startswith("----:"):
+        return f"{key.rsplit(':', 1)[-1]} (custom text)"
+    return _MP4_LABELS.get(key, key)
+
+
+def _mp4_text(value) -> Tuple[str, bool]:
+    """How an MP4 value is shown, and whether it can be edited as text."""
+    if isinstance(value, MP4Cover):
+        image = "PNG" if value.imageformat == MP4Cover.FORMAT_PNG else "JPEG"
+        return f"{image} image, {len(value) // 1024} KB", False
+    if isinstance(value, MP4FreeForm):
+        try:
+            text = bytes(value).decode("utf-8")
+        except UnicodeDecodeError:
+            return f"{len(value)} bytes of binary data", False
+        return text, _single_line(text)
+    if isinstance(value, tuple):
+        number, total = (tuple(value) + (0, 0))[:2]
+        return (f"{number}/{total}" if total else str(number)), True
+    if isinstance(value, str):
+        return value, _single_line(value)
+    return str(value), False
+
+
+def _mp4_entries(tags: MP4Tags) -> List[TagEntry]:
+    entries = []
+    for key, values in tags.items():
+        label = _mp4_label(key)
+        for value in values if isinstance(values, list) else [values]:
+            text, editable = _mp4_text(value)
+            entries.append(TagEntry(key, label, text, editable))
+    return entries
+
+
+def _ape_entries(tags: APEv2) -> List[TagEntry]:
+    entries = []
+    for key, value in tags.items():
+        _rank, label = _standard_rank(APE_KIND, key)
+        label = label or key
+        if isinstance(value, APETextValue):
+            for text in value:
+                entries.append(TagEntry(key, label, text, _single_line(text)))
+        elif isinstance(value, APEBinaryValue):
+            if key.lower().startswith("cover art"):
+                label = "Picture"
+            entries.append(TagEntry(key, label, f"{len(value.value) // 1024} KB of data", False))
+        else:
+            entries.append(TagEntry(key, label, str(value), False))
+    return entries
+
+
 def _picture_entries(audio) -> List[TagEntry]:
     """FLAC keeps pictures in their own blocks rather than among the tags."""
     entries = []
@@ -156,6 +247,10 @@ def _kind_of(tags) -> Optional[str]:
         return VORBIS_KIND
     if isinstance(tags, ASFTags):
         return ASF_KIND
+    if isinstance(tags, MP4Tags):
+        return MP4_KIND
+    if isinstance(tags, APEv2):
+        return APE_KIND
     return None
 
 
@@ -211,6 +306,10 @@ def read_file_metadata(path: Path) -> FileMetadata:
         entries = _vorbis_entries(tags)
     elif kind == ASF_KIND:
         entries = _asf_entries(tags)
+    elif kind == MP4_KIND:
+        entries = _mp4_entries(tags)
+    elif kind == APE_KIND:
+        entries = _ape_entries(tags)
     if kind is not None:
         entries = _sorted(kind, entries)
     # A field is rewritten as a whole, so one value that cannot be edited locks its siblings.
@@ -282,10 +381,54 @@ def _write_asf(tags: ASFTags, changes: Dict[str, List[str]]) -> None:
             tags[key] = [ASFUnicodeAttribute(value) for value in values]
 
 
+def _mp4_pair(text: str) -> Tuple[int, int]:
+    number, _, total = text.partition("/")
+    try:
+        return int(number), int(total) if total.strip() else 0
+    except ValueError:
+        raise ValueError(f"'{text}' is not a number such as 3 or 3/12") from None
+
+
+def _mp4_values(key: str, values: Sequence[str]) -> list:
+    if key.startswith("----:"):
+        _prefix, mean, name = (key.split(":", 2) + ["", ""])[:3]
+        if not mean or not name:
+            raise ValueError(f"'{key}' needs a name, e.g. {MP4_CUSTOM_PREFIX}Mood")
+        return [MP4FreeForm(value.encode("utf-8"), dataformat=AtomDataType.UTF8) for value in values]
+    if key in _MP4_PAIR_ATOMS:
+        return [_mp4_pair(value) for value in values]
+    if (len(key) == 4 and key.startswith("©")) or key in _MP4_TEXT_ATOMS:
+        return list(values)
+    raise ValueError(
+        f"'{key}' is not a text field M4A tags can hold; use an atom such as ©wrt, "
+        f"or {MP4_CUSTOM_PREFIX}Name for a custom text field"
+    )
+
+
+def _write_mp4(tags: MP4Tags, changes: Dict[str, List[str]]) -> None:
+    for key, values in changes.items():
+        if not values:
+            tags.pop(key, None)
+            continue
+        tags[key] = _mp4_values(key, values)
+
+
+def _write_ape(tags: APEv2, changes: Dict[str, List[str]]) -> None:
+    for key, values in changes.items():
+        if not is_valid_apev2_key(key):
+            raise ValueError(f"'{key}' is not a valid field name (2 to 255 ASCII characters)")
+        if key in tags:
+            del tags[key]
+        if values:
+            tags[key] = list(values)
+
+
 _WRITERS: Dict[str, Callable] = {
     ID3_KIND: _write_id3,
     VORBIS_KIND: _write_vorbis,
     ASF_KIND: _write_asf,
+    MP4_KIND: _write_mp4,
+    APE_KIND: _write_ape,
 }
 
 

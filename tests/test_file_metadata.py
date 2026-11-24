@@ -141,3 +141,42 @@ def test_a_tagless_file_can_get_its_first_tags(mp3):
     assert metadata.entries == [] and metadata.can_add
     write_file_metadata(mp3, {"TIT2": ["First"]})
     assert keys_and_values(read_file_metadata(mp3)) == [("TIT2", "First")]
+
+
+def test_m4a_text_pairs_and_custom_fields(m4a):
+    write_file_metadata(
+        m4a,
+        {"----:com.apple.iTunes:Mood": ["calm"], "trkn": ["3/12"], "©nam": ["Talvi"]},
+    )
+    metadata = read_file_metadata(m4a)
+    assert metadata.kind == "mp4"
+    assert [(e.key, e.label, e.value) for e in metadata.entries] == [
+        ("©nam", "Title", "Talvi"),
+        ("trkn", "Track number", "3/12"),
+        ("----:com.apple.iTunes:Mood", "Mood (custom text)", "calm"),
+    ]
+    write_file_metadata(m4a, {"trkn": ["4"], "----:com.apple.iTunes:Mood": []})
+    assert keys_and_values(read_file_metadata(m4a)) == [("©nam", "Talvi"), ("trkn", "4")]
+
+
+def test_m4a_rejects_bad_keys_and_track_numbers(m4a):
+    with pytest.raises(ValueError, match="----:com.apple.iTunes:Name"):
+        write_file_metadata(m4a, {"Mood": ["calm"]})
+    with pytest.raises(ValueError, match="needs a name"):
+        write_file_metadata(m4a, {"----:com.apple.iTunes:": ["calm"]})
+    with pytest.raises(ValueError, match="not a number"):
+        write_file_metadata(m4a, {"trkn": ["three"]})
+
+
+def test_apev2_fields_in_the_standard_order(wavpack):
+    write_file_metadata(wavpack, {"Mood": ["calm"], "Year": ["2021"], "Artist": ["A", "B"]})
+    metadata = read_file_metadata(wavpack)
+    assert metadata.kind == "ape"
+    assert [(e.key, e.label, e.value) for e in metadata.entries] == [
+        ("Artist", "Artist", "A"),
+        ("Artist", "Artist", "B"),
+        ("Year", "Date", "2021"),
+        ("Mood", "Mood", "calm"),
+    ]
+    with pytest.raises(ValueError, match="valid field name"):
+        write_file_metadata(wavpack, {"A": ["x"]})

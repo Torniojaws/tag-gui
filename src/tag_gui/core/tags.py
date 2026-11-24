@@ -3,9 +3,19 @@ from pathlib import Path
 from typing import Dict, Iterable, List, Tuple
 
 from mutagen import File as MutagenFile
+from mutagen._util import DictMixin
+from mutagen.aiff import AIFF
+from mutagen.apev2 import APETextValue
+from mutagen.easyid3 import EasyID3
 from mutagen.id3 import ID3, TXXX
+from mutagen.monkeysaudio import MonkeysAudio
+from mutagen.mp4 import AtomDataType, MP4FreeForm, MP4Tags
+from mutagen.wavpack import WavPack
 
 from .utils import seconds_to_mmss
+
+# Prefix of the freeform atoms iTunes and most taggers use for custom MP4 text fields.
+MP4_CUSTOM_PREFIX = "----:com.apple.iTunes:"
 
 
 def parse_custom_tags(text: str) -> List[str]:
@@ -34,9 +44,96 @@ def normalize_tag_name(name: str) -> str:
     return ascii_tag_key(name).casefold()
 
 
+class _EasyIFFID3(EasyID3):
+    """EasyID3 over the ID3 chunk of an AIFF file, which mutagen only offers as raw ID3."""
+
+    def __init__(self, id3):
+        self._EasyID3__id3 = id3  # where EasyID3 keeps the tags it wraps
+
+    def save(self, filething=None, **kwargs):
+        kwargs.pop("v1", None)  # an IFF chunk has no ID3v1 footer
+        self._EasyID3__id3.save(filething, **kwargs)
+
+
+class _EasyAIFF(AIFF):
+    def load(self, filething, **kwargs):
+        super().load(filething, **kwargs)
+        if self.tags is not None:
+            self.tags = _EasyIFFID3(self.tags)
+
+    def add_tags(self):
+        super().add_tags()
+        self.tags = _EasyIFFID3(self.tags)
+
+
+# APEv2 keys are case-insensitive; mapping every standard field writes the usual spelling.
+_APE_KEYS = {
+    "title": "Title",
+    "artist": "Artist",
+    "album": "Album",
+    "genre": "Genre",
+    "date": "Year",
+    "albumartist": "Album Artist",
+    "tracknumber": "Track",
+    "discnumber": "Disc",
+}
+
+
+class _EasyAPEv2(DictMixin):
+    """Easy-tag names over APEv2 tags, which call some standard fields differently."""
+
+    def __init__(self, tags):
+        self._tags = tags
+
+    @staticmethod
+    def _key(key: str) -> str:
+        return _APE_KEYS.get(key.lower(), key)
+
+    def __getitem__(self, key):
+        value = self._tags[self._key(key)]
+        return list(value) if isinstance(value, APETextValue) else [str(value)]
+
+    def __setitem__(self, key, values):
+        self._tags[self._key(key)] = list(values)
+
+    def __delitem__(self, key):
+        del self._tags[self._key(key)]
+
+    def keys(self):
+        return list(self._tags.keys())
+
+    def save(self, filething=None, **kwargs):
+        self._tags.save(filething, **kwargs)
+
+
+class _EasyAPEv2Mixin:
+    def load(self, filething, **kwargs):
+        super().load(filething, **kwargs)
+        if self.tags is not None:
+            self.tags = _EasyAPEv2(self.tags)
+
+    def add_tags(self):
+        super().add_tags()
+        self.tags = _EasyAPEv2(self.tags)
+
+
+class _EasyWavPack(_EasyAPEv2Mixin, WavPack):
+    pass
+
+
+class _EasyMonkeysAudio(_EasyAPEv2Mixin, MonkeysAudio):
+    pass
+
+
+# Formats mutagen has no easy-tag view for, opened again through one of ours.
+_EASY_TYPES = {AIFF: _EasyAIFF, WavPack: _EasyWavPack, MonkeysAudio: _EasyMonkeysAudio}
+
+
 def load_easy_tags(path: Path):
     try:
-        return MutagenFile(str(path), easy=True)
+        audio = MutagenFile(str(path), easy=True)
+        easy_type = _EASY_TYPES.get(type(audio))
+        return easy_type(str(path)) if easy_type else audio
     except Exception:
         return None
 
@@ -97,10 +194,27 @@ def get_tag_values_case_insensitive(tags, target: str):
     return None, None
 
 
+def _mp4_custom_keys(tags: MP4Tags, tag_name: str) -> List[str]:
+    target = normalize_tag_name(tag_name)
+    return [
+        key
+        for key in tags.keys()
+        if key.startswith(MP4_CUSTOM_PREFIX)
+        and normalize_tag_name(key[len(MP4_CUSTOM_PREFIX):]) == target
+    ]
+
+
 def custom_tag_checked(audio, tag_name: str) -> bool:
     # A tagless file is falsy in mutagen, so compare against None explicitly.
     if audio is None or not audio.tags:
         return False
+
+    if isinstance(audio.tags, MP4Tags):
+        return any(
+            bytes(value) == b"X"
+            for key in _mp4_custom_keys(audio.tags, tag_name)
+            for value in audio.tags[key]
+        )
 
     if isinstance(audio.tags, ID3):
         for frame in audio.tags.getall("TXXX"):
@@ -153,6 +267,16 @@ def set_custom_tag(path: Path, tag_name: str, checked: bool):
                 audio.tags.delall(f"TXXX:{frame.desc}")
         if checked:
             audio.tags.add(TXXX(encoding=3, desc=tag_name, text=["X"]))
+        audio.save()
+        return
+
+    if isinstance(audio.tags, MP4Tags):
+        for key in _mp4_custom_keys(audio.tags, tag_name):
+            del audio.tags[key]
+        if checked:
+            audio.tags[MP4_CUSTOM_PREFIX + tag_name] = [
+                MP4FreeForm(b"X", dataformat=AtomDataType.UTF8)
+            ]
         audio.save()
         return
 

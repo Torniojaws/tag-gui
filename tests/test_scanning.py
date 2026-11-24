@@ -18,6 +18,12 @@ def test_keeps_only_audio_extensions(tmp_path):
     assert [Path(p).name for p in found] == ["a.mp3", "b.FLAC"]
 
 
+def test_includes_opus_files(tmp_path):
+    (tmp_path / "song.opus").touch()
+    found = collect_audio_files([str(tmp_path)])
+    assert [Path(p).name for p in found] == ["song.opus"]
+
+
 def test_walks_directories_recursively(tmp_path):
     music = make_tree(tmp_path)
     assert any("album" in path for path in collect_audio_files([str(music)]))

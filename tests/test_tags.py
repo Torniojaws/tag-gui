@@ -9,6 +9,7 @@ from tag_gui.core.tags import (
     normalize_tag_name,
     parse_custom_tags,
     read_custom_tag_states,
+    read_track_position,
     set_custom_tag,
     set_standard_tags,
 )
@@ -102,6 +103,17 @@ def test_standard_tags_survive_a_custom_tag_write(track):
     set_standard_tags(track, {"artist": "Kaija"})
     set_custom_tag(track, "rock", True)
     assert load_easy_tags(track)["artist"] == ["Kaija"]
+
+
+def test_date_and_position_round_trip(track):
+    set_standard_tags(track, {"date": "2021", "tracknumber": "3/12", "discnumber": "2"})
+    assert load_easy_tags(track)["date"] == ["2021"]
+    assert read_track_position(track) == (2, 3)
+
+
+def test_wavpack_standard_tags_use_apev2_names(wavpack):
+    set_standard_tags(wavpack, {"title": "Laulu", "date": "2021", "tracknumber": "3"})
+    assert dict(load_raw_tags(wavpack).tags) == {"Title": "Laulu", "Year": "2021", "Track": "3"}
 
 
 def test_set_standard_tags_rejects_an_unreadable_file(tmp_path):

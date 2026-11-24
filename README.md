@@ -33,8 +33,9 @@ This is almost entirely AI-generated, so no warranties :D
    4. If it fails with `Could not load the Qt platform plugin "xcb"`, install the missing library
       with `sudo apt install libxcb-cursor0` and run it again
 4. macOS: there is no release build, and the app is untested on macOS. It should run from source
-   (see below); shortcuts use `Cmd` where this README says `Ctrl`. WMA playback needs Qt's bundled
-   FFmpeg media backend, because macOS's own media framework cannot play WMA
+   (see below); shortcuts use `Cmd` where this README says `Ctrl`. WMA, Ogg, Opus, APE and WavPack
+   playback needs Qt's bundled FFmpeg media backend, because macOS's own media framework cannot
+   play them
 5. Optional: to scrobble to Last.fm, open Settings -> Connect to Last.fm... and allow Tag GUI in
    the browser. No API key or other setup is needed with the released builds.
 
@@ -223,7 +224,7 @@ workflow run as artifacts.
 
 ## Features
 
-- Drag and drop audio files (`.mp3`, `.flac`, `.fla`, `.wma`, `.aac`) or whole folders into playlist tables, or use the Add Files button. WAV files are refused with a warning, because they cannot hold tags
+- Drag and drop audio files (`.mp3`, `.flac`, `.fla`, `.ogg`, `.opus`, `.m4a`, `.wma`, `.aac`, `.ape`, `.wv`, `.aif`, `.aiff`) or whole folders into playlist tables, or use the Add Files button. WAV files are refused with a warning, because they cannot hold tags
 - `Ctrl+C`/`Ctrl+V` (`Cmd` on macOS) copy and paste one or more selected songs between playlists; files copied in a file manager can be pasted in too
 - Dropped folders are scanned recursively with a cancellable progress dialog; tags are then read in batches so large trees stay responsive
 - Select rows (shift/ctrl click, `Ctrl+A`) and press `Delete` to remove them (on macOS also the `delete` key or `Cmd+delete`); removing several asks for confirmation
@@ -232,7 +233,7 @@ workflow run as artifacts.
 - The Sort playlist dropdown next to the mute button reorders only the current playlist: by full file path, randomly (a new order every time), or by release year oldest/newest first. Year sorting keeps each album together in track (and disc) order, falling back to song title and then path when an album has no track numbers; albums of the same year stay in their playlist order and files without a year go last. Year sorting runs in the background with a spinner, so the window stays usable; track numbers are read along with the other tags and cached, so only files cached by older versions need a one-time read. A green "Sorting completed" note fades out after 5 seconds
 - Playlist columns: Artist, Duration, Song, Year, Album, Track. Track shows the track number (`3` for `3/12`) and sorts numerically, so 2 comes before 10
 - Standard tags are edited via right-click -> Edit tags, which writes only the fields you changed, across every selected row (Duration is read-only)
-- Right-click -> View all metadata... shows everything in the right-clicked file: format details (duration, bitrate, sample rate, channels, size) and every tag with its readable name and raw key (e.g. `TIT2` in MP3, `TITLE` in FLAC). Common fields come first in the usual order (Title, Artist, Album, Album artist, Track number, Disc number, Date, Genre, Composer, Comment), then the rest as stored in the file. Fields with several values (e.g. two artists) get one row per value. Double-click a value to edit it, clear it to remove it, or use Add field... (for MP3 an ID3 frame such as `TCOM`, or `TXXX:Name` for a custom field). Pictures, binary data and multi-line text are shown but cannot be edited there. Saving updates the playlists, including the custom tag checkboxes. `.aac` files cannot hold tags, so their metadata is view-only
+- Right-click -> View all metadata... shows everything in the right-clicked file: format details (duration, bitrate, sample rate, channels, size) and every tag with its readable name and raw key (e.g. `TIT2` in MP3, `TITLE` in FLAC, `©nam` in M4A). Common fields come first in the usual order (Title, Artist, Album, Album artist, Track number, Disc number, Date, Genre, Composer, Comment), then the rest as stored in the file. Fields with several values (e.g. two artists) get one row per value. Double-click a value to edit it, clear it to remove it, or use Add field... (for MP3 an ID3 frame such as `TCOM`, or `TXXX:Name` for a custom field; for M4A an atom such as `©wrt`, or `----:com.apple.iTunes:Name` for a custom field). Pictures, binary data and multi-line text are shown but cannot be edited there. Saving updates the playlists, including the custom tag checkboxes. `.aac` files cannot hold tags, so their metadata is view-only
 - Double-click row to play, plus Previous/Play/Pause/Stop/Next controls
 - Volume slider with a separate mute button, so unmuting returns to the same volume
 - Shuffle checkbox next to the Next button (remembered between sessions): Next and the end of a song pick a random visible track that shares no artist, album or song with the last 10 played, preferring tracks not yet heard this round. Songs are matched fuzzily, so `Song (Cover)`, `Song - Live 2018` and `Song Live at Wembley` count as `Song`. If everything clashes (e.g. a single-artist playlist) it relaxes the rule instead of stopping. Previous steps back through the tracks that actually played

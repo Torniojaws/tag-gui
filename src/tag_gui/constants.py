@@ -8,9 +8,13 @@ APP_TITLE = "Tag GUI"
 DESKTOP_ID = "tag-gui"
 WINDOW_TITLE = f"{APP_TITLE} {APP_VERSION}"
 
-AUDIO_EXTENSIONS = {".mp3", ".flac", ".fla", ".wma", ".aac"}
-AUDIO_FILE_FILTER = "Audio files (*.mp3 *.flac *.fla *.wma *.aac)"
-AUDIO_FILE_FILTER_WITH_WAV = "Audio files (*.mp3 *.flac *.fla *.wma *.aac *.wav)"
+_AUDIO_SUFFIXES = (
+    ".mp3", ".flac", ".fla", ".ogg", ".opus", ".m4a", ".wma", ".aac", ".ape", ".wv", ".aif", ".aiff"
+)
+AUDIO_EXTENSIONS = set(_AUDIO_SUFFIXES)
+_AUDIO_PATTERNS = " ".join(f"*{suffix}" for suffix in _AUDIO_SUFFIXES)
+AUDIO_FILE_FILTER = f"Audio files ({_AUDIO_PATTERNS})"
+AUDIO_FILE_FILTER_WITH_WAV = f"Audio files ({_AUDIO_PATTERNS} *.wav)"
 PLAYLIST_FILE_FILTER = "Playlists (*.m3u *.m3u8)"
 
 ICON_SIZES = (16, 24, 32, 48, 64, 128, 256)
