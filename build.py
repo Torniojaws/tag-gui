@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Build tasks for tag-gui: python build.py [deps] [test] [icon] [build] [run] [clean]"""
+"""Build tasks for tag-gui: python build.py [deps] [test] [icon] [build] [glibc] [run] [clean]"""
 
+import re
 import shutil
 import subprocess
 import sys
@@ -16,6 +17,10 @@ EXE = ROOT / "dist" / (f"{APP}.exe" if WINDOWS else APP)
 # Prefer the project venv so the result does not depend on which shell is activated.
 VENV_PYTHON = ROOT / ".venv" / ("Scripts/python.exe" if WINDOWS else "bin/python")
 PYTHON = str(VENV_PYTHON) if VENV_PYTHON.exists() else sys.executable
+
+# The oldest glibc the Linux build supports. The PySide6 wheels are manylinux_2_34, so nothing
+# older can run the app anyway; the release build is made on AlmaLinux 9, which has glibc 2.34.
+GLIBC_FLOOR = (2, 34)
 
 
 def run(*args: str) -> None:
@@ -63,6 +68,43 @@ def build() -> None:
     run(*args)
 
 
+def glibc() -> None:
+    """Fail if anything bundled into the Linux executable needs a glibc newer than GLIBC_FLOOR."""
+    try:
+        from PyInstaller.archive.readers import CArchiveReader
+    except ImportError:
+        if PYTHON == sys.executable:
+            raise
+        run(PYTHON, __file__, "glibc")
+        return
+
+    pattern = re.compile(rb"GLIBC_(\d+)\.(\d+)")
+    newest: dict[tuple[int, int], list[str]] = {}
+
+    def scan(name: str, data: bytes) -> None:
+        if not data.startswith(b"\x7fELF"):
+            return
+        for match in pattern.finditer(data):
+            version = (int(match[1]), int(match[2]))
+            users = newest.setdefault(version, [])
+            if name not in users:
+                users.append(name)
+
+    scan(EXE.name, EXE.read_bytes())
+    archive = CArchiveReader(str(EXE))
+    for name in archive.toc:
+        scan(name, archive.extract(name))
+
+    highest = max(newest)
+    print(f"{EXE.name} needs glibc {highest[0]}.{highest[1]}")
+    too_new = sorted(version for version in newest if version > GLIBC_FLOOR)
+    if too_new:
+        for version in too_new:
+            print(f"  GLIBC_{version[0]}.{version[1]}: {', '.join(newest[version])}", file=sys.stderr)
+        floor = ".".join(map(str, GLIBC_FLOOR))
+        raise SystemExit(f"the executable must run on glibc {floor}: build it on an older system")
+
+
 def run_app() -> None:
     run(str(EXE))
 
@@ -79,6 +121,7 @@ TASKS = {
     "test": test,
     "icon": icon,
     "build": build,
+    "glibc": glibc,
     "run": run_app,
     "clean": clean,
 }

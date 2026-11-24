@@ -57,13 +57,21 @@ jobs:
       matrix:
         include:
           - os: windows-latest
+            # An empty container runs the job directly on the runner.
+            container: ''
             built: dist/tag-gui.exe
             asset: tag-gui-v${{ needs.version.outputs.value }}.exe
+          # The executable bundles libraries from the build system, so it only runs where glibc
+          # is at least as new as there. AlmaLinux 9 has glibc 2.34, the same floor the PySide6
+          # wheels have, so the build runs on every distribution PySide6 itself supports
+          # (Ubuntu 22.04, Debian 12, RHEL 9 and newer).
           - os: ubuntu-latest
+            container: almalinux:9
             built: dist/tag-gui
             # Not ending in the version: file managers would read e.g. ".1" as a man page.
             asset: tag-gui-v${{ needs.version.outputs.value }}-linux-x86_64
     runs-on: ${{ matrix.os }}
+    container: ${{ matrix.container }}
     defaults:
       run:
         shell: bash
@@ -71,22 +79,36 @@ jobs:
       # make_icon.py needs a Qt platform plugin, and the runners have no display.
       QT_QPA_PLATFORM: offscreen
     steps:
+      # Before checkout, so it clones with git instead of downloading an archive.
+      - name: Install Qt system libraries
+        if: runner.os == 'Linux'
+        run: |
+          dnf install -y git tar gzip \
+            glib2 mesa-libEGL mesa-libGL dbus-libs fontconfig freetype gtk3 \
+            libxkbcommon libxkbcommon-x11 libxcb xcb-util-cursor xcb-util-wm xcb-util-image \
+            xcb-util-keysyms xcb-util-renderutil pulseaudio-libs
+          dnf clean all
+
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
+        if: runner.os == 'Windows'
         with:
           python-version: '3.14'
           cache: pip
 
-      - name: Install Qt system libraries
+      # AlmaLinux 9 has no Python 3.14 package. uv's standalone Python builds need only
+      # glibc 2.17 and include the shared libpython that PyInstaller bundles.
+      - uses: astral-sh/setup-uv@v6
         if: runner.os == 'Linux'
+
+      - name: Install Python
+        if: runner.os == 'Linux'
+        env:
+          UV_PYTHON_PREFERENCE: only-managed
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            libegl1 libgl1 libglib2.0-0 libdbus-1-3 libxkbcommon0 libxkbcommon-x11-0 \
-            libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 \
-            libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 libxcb-xkb1 \
-            libpulse0
+          uv venv --seed --python 3.14 .venv
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
 
       - name: Install dependencies
         run: python build.py deps
@@ -111,6 +133,10 @@ jobs:
 
       - name: Build executable
         run: python build.py build
+
+      - name: Check the glibc requirement
+        if: runner.os == 'Linux'
+        run: python build.py glibc
 
       - name: Name executable after the version
         run: mv "${{ matrix.built }}" "dist/${{ matrix.asset }}"

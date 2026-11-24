@@ -23,7 +23,8 @@ This is almost entirely AI-generated, so no warranties :D
    1. Download the file `tag-gui-v<version>.exe` (e.g. `tag-gui-v1.0.0.exe`) and run it
    2. The executable is not code-signed, so Windows may show "Windows protected your PC". Click
       **More info** -> **Run anyway**
-3. For Debian-like (Linux Mint, Ubuntu, etc):
+3. For Debian-like (Linux Mint, Ubuntu, etc). Needs glibc 2.34 or newer, the same as the Qt
+   libraries the app uses (Ubuntu 22.04, Linux Mint 21, Debian 12, RHEL 9 or newer):
    1. Download the file `tag-gui-v<version>-linux-x86_64` (e.g. `tag-gui-v1.0.0-linux-x86_64`)
    2. Give it execute permissions with: `chmod +x tag-gui-v1.0.0-linux-x86_64`
    3. And then run it. On every start it adds (or updates) a "Tag GUI" entry with its icon in the
@@ -157,6 +158,7 @@ Python:
 | `test` | runs the test suite |
 | `icon` | regenerates `tag-gui.ico` when its sources changed |
 | `build` | builds the executable (the default when no task is given) |
+| `glibc` | Linux: fails if the built executable needs a glibc newer than 2.34 |
 | `run` | starts the built executable |
 | `clean` | removes `build/`, `dist/` and `tag-gui.spec` |
 
@@ -178,6 +180,11 @@ scrobble (`build.py` does this automatically).
 
 The binary is written to `dist/tag-gui` (`dist\tag-gui.exe` on Windows) and needs no Python
 installation. PyInstaller is not a cross-compiler, so build on the platform you target.
+
+On Linux the executable bundles libraries from the build system and only runs where glibc is at
+least as new as there, so a build made on a current distribution does not start on older ones.
+The release builds are therefore made in an AlmaLinux 9 container (glibc 2.34, the same floor
+the PySide6 wheels have), and `python build.py glibc` checks the result.
 
 ### Last.fm API key (only when running or building from source)
 
