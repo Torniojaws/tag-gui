@@ -62,9 +62,9 @@ jobs:
             built: dist/tag-gui.exe
             asset: tag-gui-v${{ needs.version.outputs.value }}.exe
           # The executable bundles libraries from the build system, so it only runs where glibc
-          # is at least as new as there. AlmaLinux 9 has glibc 2.34, the same floor the PySide6
-          # wheels have, so the build runs on every distribution PySide6 itself supports
-          # (Ubuntu 22.04, Debian 12, RHEL 9 and newer).
+          # is at least as new as there. AlmaLinux 9 (glibc 2.34 with 2.35 symbols backported)
+          # is about the oldest system the PySide6 wheels (manylinux_2_34) install on, so the
+          # build runs on Ubuntu 22.04, Debian 12, RHEL 9 and newer.
           - os: ubuntu-latest
             container: almalinux:9
             built: dist/tag-gui

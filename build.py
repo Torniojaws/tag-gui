@@ -18,9 +18,11 @@ EXE = ROOT / "dist" / (f"{APP}.exe" if WINDOWS else APP)
 VENV_PYTHON = ROOT / ".venv" / ("Scripts/python.exe" if WINDOWS else "bin/python")
 PYTHON = str(VENV_PYTHON) if VENV_PYTHON.exists() else sys.executable
 
-# The oldest glibc the Linux build supports. The PySide6 wheels are manylinux_2_34, so nothing
-# older can run the app anyway; the release build is made on AlmaLinux 9, which has glibc 2.34.
-GLIBC_FLOOR = (2, 34)
+# The newest glibc symbol version the Linux build may need. The release build is made on
+# AlmaLinux 9: its glibc is 2.34 but has 2.35 symbols backported, and its libgcc_s needs one of
+# them (_dl_find_object@GLIBC_2.35). That still runs on RHEL 9 and on any upstream glibc 2.35+
+# (Ubuntu 22.04, Debian 12); only a plain upstream 2.34, such as the long-dead Fedora 35, misses it.
+GLIBC_FLOOR = (2, 35)
 
 
 def run(*args: str) -> None:
