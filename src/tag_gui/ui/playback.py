@@ -19,7 +19,8 @@ from ..core.shuffle import TrackKey, pick_next
 from ..core.utils import seconds_to_mmss
 from .sliders import SeekSlider
 from .styles import PAUSE_GLYPH, PLAY_GLYPH, PROGRESS_HEIGHT, PROGRESS_STYLE
-from .table_fill import row_for_path, track_of
+from .table import PlaylistTable
+from .table_fill import row_for_path, rows_of_track, track_of
 from .transport import TransportBar
 from .volume import VolumeControls
 from .window_base import WindowContext
@@ -40,6 +41,9 @@ class PlaybackMixin(WindowContext):
         self.player.mediaStatusChanged.connect(self.on_media_status_changed)
         self.player.playbackStateChanged.connect(self.on_playback_state_changed)
         self._skip_blocked = False
+        # Where the current song was started from; Next and Previous carry on from there.
+        self.playing_table: Optional[PlaylistTable] = None
+        self.playing_track = ""
         # Tracks in the order they started playing, newest last.
         self._history: List[str] = []
         # Tracks played since the current shuffle round began; cleared when all have played.
@@ -113,13 +117,16 @@ class PlaybackMixin(WindowContext):
     def on_item_double_clicked(self, item):
         self.play_row(item.row())
 
-    def play_row(self, row: int, remember: bool = True):
-        table = self.current_table()
+    def play_row(self, row: int, remember: bool = True, table: Optional[PlaylistTable] = None):
+        if table is None:
+            table = self.current_table()
         if row < 0 or row >= table.rowCount():
             return
         file_path = track_of(table.item(row, PATH_COLUMN))
         if not file_path:
             return
+        self.playing_table = table
+        self.playing_track = file_path
         self.current_track_index = row
         self.player.setSource(QUrl.fromLocalFile(file_path))
         self.player.play()
@@ -160,8 +167,24 @@ class PlaybackMixin(WindowContext):
         self._shuffle_played.clear()
         save_settings(self.settings_file, self.settings)
 
-    def _visible_tracks(self) -> List[str]:
-        table = self.current_table()
+    def playback_position(self) -> Tuple[PlaylistTable, int]:
+        """The table Next and Previous step through, and the row of the playing song in it.
+
+        Playback stays in the playlist the song was started from, whichever tab is shown, so
+        looking at or editing another playlist does not restart it from the top. The row is
+        looked up again each time, because sorting and removing tracks move it. Once the song
+        is gone from that playlist, the shown one takes over from its top.
+        """
+        table = self.playing_table
+        rows = rows_of_track(table, self.playing_track) if table is not None else []
+        if not rows:
+            self.current_track_index = -1
+            return self.current_table(), -1
+        if self.current_track_index not in rows:
+            self.current_track_index = rows[0]
+        return table, self.current_track_index
+
+    def _visible_tracks(self, table: PlaylistTable) -> List[str]:
         tracks = []
         for row in range(table.rowCount()):
             if not table.isRowHidden(row):
@@ -175,43 +198,45 @@ class PlaybackMixin(WindowContext):
         return TrackKey.of(fields[ARTIST_COLUMN], fields[ALBUM_COLUMN], fields[SONG_COLUMN])
 
     def _play_shuffled(self) -> bool:
-        candidates = self._visible_tracks()
+        table, _row = self.playback_position()
+        candidates = self._visible_tracks(table)
         if not candidates:
             return False
         if all(track in self._shuffle_played for track in candidates):
             self._shuffle_played.clear()
         choice = pick_next(candidates, self.shuffle_key, self._history, self._shuffle_played)
-        return self._play_track(choice)
+        return self._play_track(table, choice)
 
     def _play_from_history(self) -> bool:
         """Shuffle has no fixed order, so Previous steps back through what actually played."""
+        table, _row = self.playback_position()
         while len(self._history) >= 2:
             self._history.pop()
-            if self._play_track(self._history[-1], remember=False):
+            if self._play_track(table, self._history[-1], remember=False):
                 return True
         return False
 
-    def _play_track(self, track: Optional[str], remember: bool = True) -> bool:
-        table = self.current_table()
+    def _play_track(
+        self, table: PlaylistTable, track: Optional[str], remember: bool = True
+    ) -> bool:
         row = row_for_path(table, track) if track else -1
         if row < 0 or table.isRowHidden(row):
             return False
-        self.play_row(row, remember)
+        self.play_row(row, remember, table)
         return True
 
     def _play_step(self, direction: int):
         """Play the next/previous row that the filter leaves visible, wrapping around."""
-        table = self.current_table()
+        table, current = self.playback_position()
         rows = table.rowCount()
         if rows == 0:
             return
-        current = self.current_track_index
         # From no track (or the first one), previous wraps to the last row.
         start = max(current, 0) if direction < 0 else current
         for step in range(1, rows + 1):
             row = (start + direction * step) % rows
             if not table.isRowHidden(row):
-                self.play_row(row)
+                self.play_row(row, table=table)
                 return
 
     def playing_title(self, file_path: str) -> str:

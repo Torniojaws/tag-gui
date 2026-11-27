@@ -19,7 +19,7 @@ from ..core.copying import copy_files, total_bytes
 from ..core.scanning import collect_audio_files
 from .sizing import screen_geometry
 from .styles import ACTIONS_WIDTH_SHARE
-from .table_fill import row_for_path, selected_tracks
+from .table_fill import selected_tracks
 from .window_base import WindowContext
 
 
@@ -177,7 +177,6 @@ class FileActionsMixin(WindowContext):
                 return
 
         removed = {Path(p) for p in paths}
-        playing = self.player.source().toLocalFile()
         playlist = self.current_playlist()
         playlist.tracks = [t for t in playlist.tracks if Path(t) not in removed]
         for track in paths:
@@ -188,10 +187,9 @@ class FileActionsMixin(WindowContext):
         finally:
             self._updating_table = False
 
-        if playing and Path(playing) in removed:
+        # The same file may still be playing from another playlist, which carries on.
+        if table is self.playing_table and Path(self.playing_track) in removed:
             self.player.stop()
             self.player.setSource(QUrl())
-            self.current_track_index = -1
-        else:
-            self.current_track_index = row_for_path(table, playing)
+            self.playing_track = ""
         self.save_state()

@@ -5,7 +5,7 @@ state and the few cross-slice methods here lets every slice be read and checked 
 """
 
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer
 from PySide6.QtWidgets import QLineEdit, QMainWindow
@@ -32,6 +32,8 @@ class WindowContext(QMainWindow):
     metadata: MetadataCache
     splash: object
     current_track_index: int
+    playing_table: Optional[PlaylistTable]
+    playing_track: str
     _updating_table: bool
 
     lastfm: LastfmController

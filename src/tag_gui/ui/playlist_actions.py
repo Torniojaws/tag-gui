@@ -86,7 +86,8 @@ class PlaylistActionsMixin(WindowContext):
         self.tabs.removeTab(index)
         widget.deleteLater()
         del self.playlists[index]
-        self.current_track_index = -1
+        if widget is self.playing_table:
+            self.playing_table = None
         if self.playlists:
             self.save_state()
         else:
@@ -118,7 +119,6 @@ class PlaylistActionsMixin(WindowContext):
         self.save_state()
 
     def on_tab_changed(self, _index):
-        self.current_track_index = -1
         self.apply_search_to_current()
 
     def on_tab_moved(self, from_index: int, to_index: int):

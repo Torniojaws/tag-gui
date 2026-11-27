@@ -944,3 +944,58 @@ def test_added_tracks_go_last_and_leave_the_album_shades_alone(window, tmp_path,
     # Song 5 finishes the album of song 4; song 6 starts the next one.
     assert after[5][1] == after[4][1] != after[6][1]
     assert window.current_playlist().tracks == songs[:7]
+
+
+@pytest.fixture
+def two_playlists(window, tmp_path, monkeypatch):
+    """Four songs in the first playlist; the second, shown last, shares two of them."""
+    songs = tagged_songs(tmp_path, [("Artist", f"Song {i}", "Album", "2000") for i in range(4)])
+    monkeypatch.setattr(MainWindow, "scan_for_audio_files", lambda self, paths: list(paths))
+    monkeypatch.setattr(window.player, "play", lambda: None)
+    window.tags_input.setText("rock")
+    window.apply_custom_tags()
+    window.add_tracks_to_current_playlist(songs)
+    window.add_playlist()
+    window.add_tracks_to_current_playlist([songs[3], songs[1]])
+    return window, songs
+
+
+def test_playback_carries_on_in_its_playlist_after_a_visit_to_another(two_playlists):
+    window, songs = two_playlists
+    first, second = window.tabs.widget(0), window.tabs.widget(1)
+    window.tabs.setCurrentIndex(0)
+    window.play_row(1)
+
+    # Tick the playing song's tag in the other playlist and come back.
+    window.tabs.setCurrentIndex(1)
+    second.item(1, len(DEFAULT_COLUMNS)).setCheckState(Qt.Checked)
+    window.tabs.setCurrentIndex(0)
+    window.on_media_status_changed(QMediaPlayer.EndOfMedia)
+    assert (window.playing_table, window.playing_track) == (first, songs[2])
+
+    # The song may also end while the other playlist is still shown.
+    window.tabs.setCurrentIndex(1)
+    window.on_media_status_changed(QMediaPlayer.EndOfMedia)
+    assert (window.playing_table, window.playing_track) == (first, songs[3])
+    assert window.player.source().toLocalFile() == songs[3]
+
+    # Removing the same file from the other playlist leaves the playing one alone.
+    second.selectRow(0)
+    window.remove_selected_tracks()
+    assert window.player.source().toLocalFile() == songs[3]
+    window.play_previous()
+    assert (window.playing_table, window.playing_track) == (first, songs[2])
+
+
+def test_next_follows_the_playing_song_through_a_header_sort(two_playlists):
+    window, songs = two_playlists
+    window.tabs.setCurrentIndex(0)
+    table = window.current_table()
+    window.play_row(1)
+    song_column = DEFAULT_COLUMNS.index("Song")
+    table.sort_by_column(song_column)
+    table.sort_by_column(song_column)  # descending: the playing song moves to row 2
+
+    window.play_next()
+    assert window.playing_track == songs[0]
+    assert window.current_track_index == 3

@@ -18,7 +18,6 @@ from ..core.sorting import SortFields, by_path, by_year, shuffled
 from ..core.tags import read_track_position
 from .spinner import Spinner
 from .styles import SORT_DONE_COLOR, SORT_DONE_FADE_MS, SORT_DONE_VISIBLE_MS
-from .table_fill import row_for_path
 from .window_base import WindowContext
 
 SORT_BY_PATH = "path"
@@ -208,9 +207,6 @@ class SortMixin(WindowContext):
 
         table = self.tabs.widget(index)
         table.reorder(ordered)
-        if table is self.current_table():
-            playing = self.player.source().toLocalFile()
-            self.current_track_index = row_for_path(table, playing) if playing else -1
         table.scrollToTop()
         self.save_state()
         self.show_sort_done()
