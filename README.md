@@ -14,7 +14,7 @@ This is almost entirely AI-generated, so no warranties :D
 [![Tests](https://github.com/Torniojaws/tag-gui/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/Torniojaws/tag-gui/actions/workflows/tests.yml)
 [![Build and release](https://github.com/Torniojaws/tag-gui/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/Torniojaws/tag-gui/actions/workflows/build.yml)
 
-<img width="3838" height="2108" alt="image" src="https://github.com/user-attachments/assets/5c2aab1a-f2c7-493f-85ec-eeb473df9106" />
+<img width="3839" height="2109" alt="image" src="https://github.com/user-attachments/assets/62dca58c-bacd-476e-8426-cf122b87d182" />
 
 ## Downloads
 
