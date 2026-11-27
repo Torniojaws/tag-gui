@@ -61,6 +61,9 @@ class WindowContext(QMainWindow):
     def populate_table(self, table: PlaylistTable, playlist: Playlist) -> None:
         raise NotImplementedError
 
+    def append_tracks(self, table: PlaylistTable, playlist: Playlist, tracks: List[str]) -> None:
+        raise NotImplementedError
+
     def refresh_tracks(self, table: PlaylistTable, tracks: List[str]) -> None:
         raise NotImplementedError
 

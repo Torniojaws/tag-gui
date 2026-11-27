@@ -67,11 +67,15 @@ class FileActionsMixin(WindowContext):
             return
         playlist = self.current_playlist()
         known = set(playlist.tracks)
+        added = []
         for track in tracks:
             if track not in known:
                 known.add(track)
-                playlist.tracks.append(track)
-        self.populate_table(self.current_table(), playlist)
+                added.append(track)
+        if not added:
+            return
+        playlist.tracks.extend(added)
+        self.append_tracks(self.current_table(), playlist, added)
         self.save_state()
 
     def scan_for_audio_files(self, paths: List[str]) -> List[str]:

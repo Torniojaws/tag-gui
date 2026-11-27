@@ -338,21 +338,28 @@ class PlaylistTable(QTableWidget):
         self.visible_rows = visible
         self.filter_applied.emit()
 
-    def apply_album_colors(self):
+    def _album(self, row: int) -> str:
+        album_item = self.item(row, ALBUM_COLUMN)
+        return album_item.text() if album_item else ""
+
+    def apply_album_colors(self, first_row: int = 0):
         """Shade consecutive rows of one album alike, flipping shade at every album change.
 
         Only a shade per row is stored; the delegate paints it. Setting a background on every
         cell instead takes seconds on big playlists once rows have been moved around.
+
+        Rows above ``first_row`` keep their shade and the rows from there on carry on from the
+        row above, so appended rows never change how the existing ones look.
         """
         base = self.palette().base().color()
         tint = ALBUM_TINT_LIGHT if base.lightness() > 128 else ALBUM_TINT_DARK
         self._shade_brushes = (QBrush(base), QBrush(QColor(*tint)))
-        shades = []
-        shade = 0
-        previous = None
-        for row in range(self.rowCount()):
-            album_item = self.item(row, ALBUM_COLUMN)
-            album = album_item.text() if album_item else ""
+        first_row = min(first_row, len(self._row_shades))
+        shades = self._row_shades[:first_row]
+        shade = shades[-1] if shades else 0
+        previous = self._album(first_row - 1) if shades else None
+        for row in range(first_row, self.rowCount()):
+            album = self._album(row)
             if previous is not None and album != previous:
                 shade = 1 - shade
             previous = album

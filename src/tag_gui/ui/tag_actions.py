@@ -12,7 +12,7 @@ from ..core.tags import parse_custom_tags, set_custom_tag, set_standard_tags
 from .dialogs import StandardTagsDialog
 from .metadata_dialog import MetadataDialog
 from .styles import ROW_MARGIN
-from .table_fill import TAG_NAME_ROLE, selected_tracks, track_of
+from .table_fill import TAG_NAME_ROLE, selected_tracks, show_tag_state, track_of
 from .window_base import WindowContext
 
 MAX_REPORTED_FAILURES = 10
@@ -73,10 +73,14 @@ class TagActionsMixin(WindowContext):
         def save(changes):
             write_file_metadata(path, changes)
             self.metadata.discard(track)
-            for index in range(self.tabs.count()):
-                self.refresh_tracks(self.tabs.widget(index), [track])
+            self.refresh_tracks_in_all_playlists([track])
 
         MetadataDialog(path, metadata, save, self).exec()
+
+    def refresh_tracks_in_all_playlists(self, tracks: List[str]):
+        """A file can sit in several playlists, and each of them shows its tags."""
+        for index in range(self.tabs.count()):
+            self.refresh_tracks(self.tabs.widget(index), tracks)
 
     def edit_selected_tags(self):
         table = self.current_table()
@@ -101,7 +105,7 @@ class TagActionsMixin(WindowContext):
             else:
                 self.metadata.discard(track)
                 updated.append(track)
-        self.refresh_tracks(table, updated)
+        self.refresh_tracks_in_all_playlists(updated)
         if failures:
             self.report_failures(failures)
 
@@ -133,3 +137,10 @@ class TagActionsMixin(WindowContext):
                 self._updating_table = False
             return
         self.metadata.update_tag_state(track, tag, checked)
+        # Every table has the same columns, so the tag sits in this column in all of them.
+        self._updating_table = True
+        try:
+            for index in range(self.tabs.count()):
+                show_tag_state(self.tabs.widget(index), track, item.column(), checked)
+        finally:
+            self._updating_table = False

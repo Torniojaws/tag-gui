@@ -5,7 +5,7 @@ from PySide6.QtCore import QEvent, QItemSelectionModel, QPoint, Qt
 from PySide6.QtGui import QKeyEvent
 from PySide6.QtMultimedia import QMediaPlayer
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QDialog
 
 from tag_gui.constants import DEFAULT_COLUMNS, PATH_COLUMN
 from tag_gui.core.settings import Settings
@@ -862,3 +862,85 @@ def test_missing_track_numbers_are_read_in_the_background(window, tmp_path, monk
     QTest.qWait(50)
     assert [table.item(row, TRACK_COLUMN).text() for row in range(3)] == ["5", "6", "7"]
     assert window.metadata.cached_position(songs[0]) == (0, 5)
+
+
+def test_ticking_a_tag_shows_in_every_playlist_with_the_file(window, tmp_path, monkeypatch):
+    from tag_gui.core.tags import read_custom_tag_states
+    from tag_gui.ui import tag_actions
+
+    songs = [str(write_flac(tmp_path / f"song{i}.flac")) for i in range(3)]
+    monkeypatch.setattr(MainWindow, "scan_for_audio_files", lambda self, paths: list(paths))
+    window.tags_input.setText("rock, calm")
+    window.apply_custom_tags()
+    window.add_tracks_to_current_playlist(songs)
+    window.add_playlist()
+    window.add_tracks_to_current_playlist([songs[2], songs[1]])
+    first, second = window.tabs.widget(0), window.tabs.widget(1)
+    rock, calm = len(DEFAULT_COLUMNS), len(DEFAULT_COLUMNS) + 1
+    writes = []
+    write = tag_actions.set_custom_tag
+    monkeypatch.setattr(
+        tag_actions, "set_custom_tag", lambda *args: (writes.append(args), write(*args))
+    )
+
+    first.item(1, rock).setCheckState(Qt.Checked)
+    assert second.item(1, rock).checkState() == Qt.Checked
+    assert second.item(0, rock).checkState() == Qt.Unchecked
+    assert second.item(1, calm).checkState() == Qt.Unchecked
+
+    second.item(1, rock).setCheckState(Qt.Unchecked)
+    assert first.item(1, rock).checkState() == Qt.Unchecked
+    # Mirroring into the other playlist must not write the file again.
+    assert len(writes) == 2
+    assert read_custom_tag_states(tmp_path / "song1.flac", ["rock"]) == {"rock": False}
+
+
+def test_edit_tags_shows_in_every_playlist_with_the_file(window, tmp_path, monkeypatch):
+    from tag_gui.ui import tag_actions
+
+    song = str(write_flac(tmp_path / "song.flac"))
+    monkeypatch.setattr(MainWindow, "scan_for_audio_files", lambda self, paths: list(paths))
+    window.add_tracks_to_current_playlist([song])
+    window.add_playlist()
+    window.add_tracks_to_current_playlist([song])
+    monkeypatch.setattr(tag_actions.StandardTagsDialog, "exec", lambda self: QDialog.Accepted)
+    monkeypatch.setattr(
+        tag_actions.StandardTagsDialog, "changed_values", lambda self: {"album": "Renamed"}
+    )
+
+    window.current_table().selectRow(0)
+    window.edit_selected_tags()
+
+    album = DEFAULT_COLUMNS.index("Album")
+    assert [window.tabs.widget(i).item(0, album).text() for i in range(2)] == ["Renamed"] * 2
+
+
+def test_added_tracks_go_last_and_leave_the_album_shades_alone(window, tmp_path, monkeypatch):
+    songs = tagged_songs(
+        tmp_path, [("Artist", f"Song {i}", f"Album {i // 2}", "2000") for i in range(8)]
+    )
+    monkeypatch.setattr(MainWindow, "scan_for_audio_files", lambda self, paths: list(paths))
+    window.tags_input.setText("rock")
+    window.apply_custom_tags()
+    window.add_tracks_to_current_playlist(songs[:5])
+    table = window.current_table()
+    rock = len(DEFAULT_COLUMNS)
+    table.sort_by_column(rock)
+    # Checked rows sort first, so a rebuild would move this row up and flip every shade.
+    table.item(3, rock).setCheckState(Qt.Checked)
+
+    def shades():
+        return [
+            (table.item(row, PATH_COLUMN).data(Qt.UserRole), table.row_background(row).color())
+            for row in range(table.rowCount())
+        ]
+
+    before = shades()
+    window.add_tracks_to_current_playlist(songs[5:7])
+
+    after = shades()
+    assert after[:5] == before
+    assert [track for track, _color in after[5:]] == songs[5:7]
+    # Song 5 finishes the album of song 4; song 6 starts the next one.
+    assert after[5][1] == after[4][1] != after[6][1]
+    assert window.current_playlist().tracks == songs[:7]

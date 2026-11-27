@@ -235,6 +235,7 @@ workflow run as artifacts.
 
 - Drag and drop audio files (`.mp3`, `.flac`, `.fla`, `.ogg`, `.opus`, `.m4a`, `.wma`, `.aac`, `.ape`, `.wv`, `.aif`, `.aiff`) or whole folders into playlist tables, or use the Add Files button. WAV files are refused with a warning, because they cannot hold tags
 - `Ctrl+C`/`Ctrl+V` (`Cmd` on macOS) copy and paste one or more selected songs between playlists; files copied in a file manager can be pasted in too
+- Added songs (dropped, pasted or picked with Add Files) go to the bottom of the playlist. The songs already there keep their place and their shade, also when the table is sorted by a column; click the header again to sort the new songs in
 - Dropped folders are scanned recursively with a cancellable progress dialog; tags are then read in batches so large trees stay responsive
 - Select rows (shift/ctrl click, `Ctrl+A`) and press `Delete` to remove them (on macOS also the `delete` key or `Cmd+delete`); removing several asks for confirmation
 - `Home`/`End` scroll the playlist to the top/bottom without changing the selection; on macOS also `Fn+Left`/`Fn+Right` or `Cmd+Up`/`Cmd+Down`
@@ -252,6 +253,7 @@ workflow run as artifacts.
 - Custom checkbox-tag columns: type comma-separated tag names in the textbox above the playlists and click Apply Tags (persisted in `custom_tags.txt` under app data)
 - Tag names are displayed as typed but stored as ASCII (`Yömusa` is written to files as `Yomusa`)
 - Custom tag value `X` means checked; unchecking removes the tag from the file, checking writes it back
+- A file can be in several playlists: ticking a checkbox or editing its tags in one playlist updates it in all of them
 - Rows are shaded per album run: the shade flips whenever the album changes, so consecutive tracks of one album share a background
 - Sortable/resizable columns with horizontal scrolling. Clicking Artist, Duration, Song, Year, Album or Track sorts ascending (A-Z, oldest first); a custom tag column starts descending instead (checked tags on top). Clicking the same header again flips the order, and clicking a different header starts that column over. Each sort scrolls back to the top
 - Drag a column header to reorder the columns, or drag a header edge to resize a column; the order and widths apply to every playlist, including new ones, and are remembered between sessions (`settings.json`). Columns you have not resized fit their contents, and new custom tag columns go last (a new built-in column, like Track, goes next to its neighbour instead)

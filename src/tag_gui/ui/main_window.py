@@ -29,7 +29,7 @@ from .search import SearchMixin
 from .sorting import SortMixin
 from .styles import ROW_MARGIN
 from .table import PlaylistTable
-from .table_fill import fill_table, refresh_rows
+from .table_fill import append_rows, fill_table, refresh_rows
 from .tag_actions import TagActionsMixin
 from .track_numbers import TrackNumbersMixin
 
@@ -156,6 +156,23 @@ class MainWindow(
         try:
             with table.quiet_layout():
                 fill_table(table, playlist, self.custom_tags, self.metadata, update)
+            self.apply_column_layout(table)
+        finally:
+            finish()
+            self._updating_table = False
+
+    def append_tracks(self, table: PlaylistTable, playlist: Playlist, tracks: List[str]):
+        """Show tracks just added to the end of ``playlist`` without disturbing the other rows."""
+        if table.rowCount() == 0:
+            self.populate_table(table, playlist)
+            return
+        update, finish = progress_reporter(
+            self, self.splash, f"Reading tags for {playlist.name}", len(tracks)
+        )
+        self._updating_table = True
+        try:
+            with table.quiet_layout():
+                append_rows(table, tracks, self.custom_tags, self.metadata, update)
             self.apply_column_layout(table)
         finally:
             finish()
