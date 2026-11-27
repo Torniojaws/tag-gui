@@ -1,5 +1,7 @@
 """One offscreen run of the real window, so a broken mixin or layout fails the suite."""
 
+from pathlib import Path
+
 import pytest
 from PySide6.QtCore import QEvent, QItemSelectionModel, QPoint, Qt
 from PySide6.QtGui import QKeyEvent
@@ -977,12 +979,12 @@ def test_playback_carries_on_in_its_playlist_after_a_visit_to_another(two_playli
     window.tabs.setCurrentIndex(1)
     window.on_media_status_changed(QMediaPlayer.EndOfMedia)
     assert (window.playing_table, window.playing_track) == (first, songs[3])
-    assert window.player.source().toLocalFile() == songs[3]
+    assert Path(window.player.source().toLocalFile()) == Path(songs[3])
 
     # Removing the same file from the other playlist leaves the playing one alone.
     second.selectRow(0)
     window.remove_selected_tracks()
-    assert window.player.source().toLocalFile() == songs[3]
+    assert Path(window.player.source().toLocalFile()) == Path(songs[3])
     window.play_previous()
     assert (window.playing_table, window.playing_track) == (first, songs[2])
 

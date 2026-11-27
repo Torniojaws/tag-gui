@@ -21,6 +21,26 @@ file name ending in `.Z` is taken for a file type extension (`.1` is a man page)
 would not run it. If a release of the version already exists, CI publishes the next free
 patch version instead and stamps it into the build; the source file is not changed by CI.
 
+## Windows and Linux paths
+
+The app is released for Windows and Linux, and CI runs the tests on both
+(`.github/workflows/tests.yml`). A local run covers only one of them, so check every change
+that handles file paths, in app code and in tests, against both before finishing:
+
+- The same file is spelled differently depending on where the path comes from. Qt
+  (`QUrl.toLocalFile()`, file dialogs, dropped or pasted URLs) uses forward slashes on every
+  system, while `str(Path(...))` uses backslashes on Windows:
+  `C:/Music/song.flac` vs `C:\Music\song.flac`.
+- Never compare paths from different sources as plain strings. Compare `Path` objects, e.g.
+  `Path(player.source().toLocalFile()) == Path(track)`. This also covers Windows treating
+  file names as case-insensitive.
+- Plain string comparison is fine only between the app's own track strings (playlist
+  entries, the `Qt.UserRole` data of table rows, metadata cache keys), which are stored once
+  and passed around unchanged. Turn a path from Qt or from the user into that form with
+  `str(Path(...))` before storing it.
+- Build and take apart paths with `pathlib`. Do not join with `/` or `\`, split on a
+  separator, or hard-code one in an expected value of a test.
+
 ## Secrets
 
 The Last.fm API key and shared secret live only in the gitignored
